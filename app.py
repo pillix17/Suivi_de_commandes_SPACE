@@ -9,11 +9,22 @@ import json
 from datetime import datetime
 
 app = Flask(__name__, template_folder="templates")
-DOSSIER = os.path.dirname(os.path.abspath(__file__))
+# Répertoire des données : env SUIVI_DATA (défini par le lanceur .app)
+# ou ~/Library/Application Support/SuiviCommandes en mode app
+# ou le dossier du script en mode développement
+_default_data = os.path.expanduser("~/Library/Application Support/SuiviCommandes")
+DOSSIER = os.environ.get("SUIVI_DATA", _default_data)
+os.makedirs(DOSSIER, exist_ok=True)
 STATUT_COL = "Statut Traitement"
 STATUTS = ["A faire", "En cours", "Traité"]
-MASTER_FILE = "suivi_master.csv"
-HISTORY_FILE = "import_history.json"
+MASTER_FILE    = "suivi_master.csv"
+HISTORY_FILE   = "import_history.json"
+PRESETS_FILE   = "product_presets.json"
+PRODUCTS_REF   = "produits_reference.csv"
+
+# Preset "produits-SPACE" : Communication sauf ces 4 codes + 3 ajouts
+_SPACE_EXCLUS = {"HA851", "LO819", "MI852", "MI853"}
+_SPACE_AJOUTS = {"LO881", "SA880", "SP860"}
 
 COLONNES = [
     "Source", "N° Commande", "Date Commande", "Société / Client",
@@ -127,6 +138,60 @@ def normaliser_expose(chemin):
         "Contact Mobile":   col(df, "mobile_livraison"),
         "Semaine Import":   semaine_courante(),
     })[COLONNES]
+
+
+# ── Produits & Presets ────────────────────────────────────────
+
+def _ref_path():
+    """Cherche le fichier de référence produits dans DOSSIER puis à côté du script."""
+    for p in [
+        os.path.join(DOSSIER, PRODUCTS_REF),
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), PRODUCTS_REF),
+    ]:
+        if os.path.exists(p):
+            return p
+    return None
+
+def lire_produits_reference():
+    path = _ref_path()
+    if not path:
+        return None
+    df, _ = lire_csv_brut(path)
+    df.columns = [c.strip().strip('"') for c in df.columns]
+    return df
+
+def construire_preset_space():
+    df = lire_produits_reference()
+    if df is None:
+        return []
+    fam_col  = next((c for c in df.columns if "famille"  in c.lower()), None)
+    code_col = next((c for c in df.columns if c.lower() == "code"),     None)
+    if not fam_col or not code_col:
+        return []
+    comm   = df[df[fam_col].str.strip().str.lower() == "communication"]
+    codes  = {c.strip().strip('"') for c in comm[code_col].dropna() if c.strip().strip('"')}
+    codes -= _SPACE_EXCLUS
+    codes |= _SPACE_AJOUTS
+    return sorted(codes)
+
+def lire_presets():
+    path = os.path.join(DOSSIER, PRESETS_FILE)
+    if os.path.exists(path):
+        try:
+            with open(path, encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {}
+
+def sauver_presets(p):
+    with open(os.path.join(DOSSIER, PRESETS_FILE), "w", encoding="utf-8") as f:
+        json.dump(p, f, ensure_ascii=False, indent=2)
+
+def init_presets():
+    if not os.path.exists(os.path.join(DOSSIER, PRESETS_FILE)):
+        codes = construire_preset_space()
+        sauver_presets({"produits-SPACE": codes} if codes else {})
 
 
 # ── Routes ─────────────────────────────────────────────────────
@@ -284,7 +349,66 @@ def api_import_history():
         return jsonify([])
 
 
+@app.route("/api/products")
+def api_products():
+    df = lire_produits_reference()
+    if df is not None:
+        code_col  = next((c for c in df.columns if c.lower() == "code"),                None)
+        label_col = next((c for c in df.columns if "lib" in c.lower()),                 None)
+        fam_col   = next((c for c in df.columns if "famille" in c.lower()),             None)
+        if code_col:
+            result = []
+            for _, row in df.iterrows():
+                code  = str(row[code_col]).strip().strip('"')
+                label = str(row[label_col]).strip().strip('"') if label_col else ""
+                fam   = str(row[fam_col]).strip().strip('"')   if fam_col  else ""
+                if code and code.lower() not in ("nan", "") and fam.lower() != "nan":
+                    result.append({"code": code, "label": label, "famille": fam or "Autres"})
+            return jsonify(result)
+
+    # Fallback : extraire du master
+    master_path = os.path.join(DOSSIER, MASTER_FILE)
+    if os.path.exists(master_path):
+        df_m = lire_csv(master_path)
+        seen, result = set(), []
+        for _, row in df_m[["Code Produit","Libellé Produit"]].drop_duplicates().iterrows():
+            c = str(row["Code Produit"]).strip()
+            if c and c not in seen:
+                seen.add(c)
+                result.append({"code": c, "label": str(row["Libellé Produit"]).strip(), "famille": ""})
+        return jsonify(sorted(result, key=lambda x: x["code"]))
+    return jsonify([])
+
+
+@app.route("/api/presets", methods=["GET"])
+def api_get_presets():
+    return jsonify(lire_presets())
+
+
+@app.route("/api/presets", methods=["POST"])
+def api_save_preset():
+    data  = request.json
+    name  = (data.get("name") or "").strip()
+    codes = data.get("codes", [])
+    if not name:
+        return jsonify({"error": "Nom manquant"}), 400
+    p = lire_presets()
+    p[name] = sorted(set(codes))
+    sauver_presets(p)
+    return jsonify({"ok": True, "count": len(codes)})
+
+
+@app.route("/api/presets/<name>", methods=["DELETE"])
+def api_delete_preset(name):
+    p = lire_presets()
+    if name in p:
+        del p[name]
+        sauver_presets(p)
+    return jsonify({"ok": True})
+
+
 if __name__ == "__main__":
+    init_presets()
     import webbrowser, threading, time
     def ouvrir(): time.sleep(1); webbrowser.open("http://127.0.0.1:5050")
     threading.Thread(target=ouvrir, daemon=True).start()
