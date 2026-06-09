@@ -70,6 +70,15 @@ def save_icns(path: str) -> None:
     print(f"[OK] {path}")
 
 
+def save_wizard_bmp(path: str) -> None:
+    """Genere le petit logo 55x58 px pour l'assistant Inno Setup (BMP requis)."""
+    src = load_source()
+    img = src.resize((55, 58), Image.Resampling.LANCZOS).convert("RGB")
+    img.save(path, format="BMP")
+    print(f"[OK] {path}")
+
+
 if __name__ == "__main__":
     save_ico("icon.ico")
     save_icns("icon.icns")
+    save_wizard_bmp("wizard_small.bmp")

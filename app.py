@@ -56,6 +56,7 @@ _SPACE_AJOUTS = {"LO881", "SA880", "SP860"}
 
 COLONNES = [
     "Source", "N° Commande", "Date Commande", "Société / Client",
+    "Facturé à",
     "Statut", "Code Produit", "Libellé Produit", "Quantité",
     "Total HT", "Total TTC", "Contact Nom", "Contact Prénom",
     "Contact Email", "Contact Mobile", "Semaine Import",
@@ -134,6 +135,7 @@ def normaliser_klipso(chemin):
         "N° Commande":      col(df, "N° de commande (Commande)"),
         "Date Commande":    col(df, "Date de commande (Commande)"),
         "Société / Client": col(df, "Concerne (Commande)"),
+        "Facturé à":        col(df, "Facturé à (Commande)"),
         "Statut":           col(df, "État (Commande)"),
         "Code Produit":     col(df, "Code (Produit)"),
         "Libellé Produit":  col(df, "Libellé en Français (Produit)"),
@@ -154,6 +156,7 @@ def normaliser_expose(chemin):
         "N° Commande":      col(df, "no_cde_fournisseur", "no_facture"),
         "Date Commande":    col(df, "date_initiale_commande", "date_maj"),
         "Société / Client": col(df, "enseigne_participant", "société", "societe"),
+        "Facturé à":        col(df, "societe_facturation", "facture_a", "facturé à"),
         "Statut":           col(df, "statut_client", "statut fournisseur"),
         "Code Produit":     col(df, "reference_produit", "reference", "sku"),
         "Libellé Produit":  col(df, "produit_fournisseur"),

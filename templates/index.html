@@ -227,6 +227,9 @@ a{color:inherit;text-decoration:none}
 .badge.n{color:var(--muted);background:var(--bg)}
 .badge.s-confirme{color:var(--green);background:var(--green-bg)}
 .badge.s-autre{color:var(--muted);background:var(--bg)}
+/* Badge "facturé à" */
+.badge-facture{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:600;white-space:nowrap;background:#fff7ed;color:#c2410c;border:1px solid #fed7aa}
+.badge-facture .bf-arrow{opacity:.7}
 
 /* ── TABLEAU VIEW ── */
 .table-wrap{overflow-x:auto}
@@ -399,6 +402,11 @@ function sumHT(lines){
   return lines.reduce((s,l)=>s+(parseFloat(l["Total HT"])||0),0);
 }
 function srcBadge(s){ return `<span class="badge ${s==="Klipso"?"k":"e"}">${esc(s)}</span>` }
+function factureBadge(concerne, facture){
+  const f=(facture||"").trim(), c=(concerne||"").trim();
+  if(!f || f===c) return "";
+  return `<span class="badge-facture"><span class="bf-arrow">facturé →</span> ${esc(f)}</span>`;
+}
 function statutBadge(s){
   const cls = (s||"").toLowerCase().includes("confirm")?"s-confirme":"s-autre";
   return `<span class="badge ${cls}">${esc(s)}</span>`;
@@ -509,6 +517,7 @@ const FLAT_COLS=[
   {k:"N° Commande",l:"N° Cde",w:100,mono:true},
   {k:"Date Commande",l:"Date",w:85},
   {k:"Société / Client",l:"Société",w:180,wrap:true},
+  {k:"Facturé à",l:"Facturé à",w:160,wrap:true},
   {k:"Code Produit",l:"Code",w:90,mono:true},
   {k:"Libellé Produit",l:"Libellé",w:220,wrap:true},
   {k:"Quantité",l:"Qté",w:45,r:true},
@@ -539,6 +548,11 @@ function renderTableau(recs,container){
       if(c.k==="Source") return `<td>${srcBadge(r[c.k])}</td>`;
       if(c.k==="Statut") return `<td>${statutBadge(r[c.k])}</td>`;
       if(c.k==="Statut Traitement") return `<td>${sselect(r[c.k],r["_index"])}</td>`;
+      if(c.k==="Facturé à"){
+        const f=(r["Facturé à"]||"").trim(), s=(r["Société / Client"]||"").trim();
+        if(!f||f===s) return `<td style="color:var(--muted2)">—</td>`;
+        return `<td>${factureBadge(s,f)}</td>`;
+      }
       if(c.k==="Total HT"||c.k==="Quantité") return `<td class="num">${c.k==="Total HT"?fmtEUR(r[c.k]):esc(r[c.k])}</td>`;
       const cls=[c.mono?"mono":"",c.wrap?"wrap":"",c.r?"r":""].filter(Boolean).join(" ");
       return `<td class="${cls}">${esc(r[c.k])}</td>`;
@@ -579,6 +593,7 @@ function renderCommandes(recs,container){
         ${srcBadge(co["Source"])}
         <span class="card-title">${esc(order)}</span>
         <span class="card-meta">${esc(co["Société / Client"])} · ${fmtDate(co["Date Commande"])}</span>
+        ${factureBadge(co["Société / Client"], co["Facturé à"])}
         ${ssBadges(lines)}
         ${ht>0?`<span class="card-ht">${fmtEUR(ht)}</span>`:""}
         <span class="card-meta">${lines.length} ligne${lines.length>1?"s":""}</span>
@@ -623,6 +638,7 @@ function renderEntreprises(recs,container){
         ${srcBadge(oLines[0]["Source"])}
         <span style="font-family:ui-monospace,monospace">${esc(order)}</span>
         <span style="font-weight:400">${fmtDate(oLines[0]["Date Commande"])}</span>
+        ${factureBadge(oLines[0]["Société / Client"], oLines[0]["Facturé à"])}
         ${ssBadges(oLines)}
         ${oHT>0?`<span style="margin-left:auto;font-weight:700;color:var(--text)">${fmtEUR(oHT)}</span>`:""}
         <button class="btn-all" onclick="markAll(event,[${oLines.map(l=>l["_index"]).join(",")}],'Traité')">✓ Tout traité</button>
@@ -644,6 +660,7 @@ function renderProduits(recs,container){
     const [code,label]=key_.split("||");
     const key=`prd:${key_}`;
     const companies=new Set(lines.map(l=>l["Société / Client"]));
+    const ncds=new Set(lines.map(l=>l["N° Commande"])).size;
     const totalQty=lines.reduce((s,l)=>s+(parseFloat(l["Quantité"])||0),0);
     const ht=sumHT(lines);
     const isOpen=openCards.has(key)||autoOpen;
@@ -652,26 +669,11 @@ function renderProduits(recs,container){
         <span class="chevron">▶</span>
         <span class="badge n">${esc(code)}</span>
         <span class="card-title">${esc(label)}</span>
-        <span class="card-meta">${companies.size} entreprise${companies.size>1?"s":" "}${totalQty?` · qté ${totalQty}`:""}</span>
+        <span class="card-meta">${companies.size} entreprise${companies.size>1?"s":""} · ${ncds} commande${ncds>1?"s":""}${totalQty?` · qté ${totalQty}`:""}</span>
         ${ssBadges(lines)}
         ${ht>0?`<span class="card-ht">${fmtEUR(ht)}</span>`:""}
       </div>
-      <div class="card-body${isOpen?" open":""}">
-        <div class="company-rows">`;
-    const byComp=groupBy(lines,"Société / Client");
-    for(const [comp,cLines] of byComp){
-      const orders=[...new Set(cLines.map(l=>l["N° Commande"]))].join(", ");
-      const qty=cLines.reduce((s,l)=>s+(parseFloat(l["Quantité"])||0),0);
-      const cHT=sumHT(cLines);
-      html+=`<div class="company-row">
-        <span class="cr-name">${esc(comp)}</span>
-        <span class="cr-order">${esc(orders)}</span>
-        <span class="cr-qty">${qty?`qté ${qty}`:""}</span>
-        <span class="cr-ht">${cHT>0?fmtEUR(cHT):""}</span>
-        ${ssBadges(cLines)}
-      </div>`;
-    }
-    html+=`</div>`;
+      <div class="card-body${isOpen?" open":""}">`;
     html+=ptable(lines,["Société / Client","N° Commande","Quantité","Total HT","Statut Traitement"]);
     html+=`</div></div>`;
   }
