@@ -71,12 +71,12 @@ def save_ico(path: str) -> None:
         sizes=[(s, s) for s in sizes],
         append_images=images[1:],
     )
-    print(f"✓ {path}")
+    print(f"[OK] {path}")
 
 
 def save_icns(path: str) -> None:
     if sys.platform != "darwin":
-        print("  (icon.icns ignoré — macOS seulement)")
+        print("  (icon.icns skipped - macOS only)")
         return
     iconset = path.replace(".icns", ".iconset")
     os.makedirs(iconset, exist_ok=True)
@@ -91,7 +91,7 @@ def save_icns(path: str) -> None:
         draw_icon(size).save(os.path.join(iconset, f"{name}.png"))
     subprocess.run(["iconutil", "-c", "icns", iconset, "-o", path], check=True)
     shutil.rmtree(iconset)
-    print(f"✓ {path}")
+    print(f"[OK] {path}")
 
 
 if __name__ == "__main__":
