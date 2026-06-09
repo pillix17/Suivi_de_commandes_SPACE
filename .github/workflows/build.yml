@@ -1,0 +1,157 @@
+name: Build Installers
+
+# Déclenché par :
+#   - push d'un tag vX.Y.Z  →  crée une GitHub Release avec les 2 installateurs
+#   - déclenchement manuel  →  build uniquement (artifacts téléchargeables 90 jours)
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Numéro de version (ex : 1.0.0)"
+        required: true
+        default: "1.0.0"
+
+jobs:
+  # ─────────────────────────────────────────────
+  #  WINDOWS  →  SuiviCommandes_Setup_Windows.exe
+  # ─────────────────────────────────────────────
+  build-windows:
+    name: "🪟 Build Windows"
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Installer les dépendances
+        run: |
+          pip install --upgrade pip
+          pip install flask pandas waitress pyinstaller pillow
+
+      - name: Générer l'icône
+        run: python make_icon.py
+
+      - name: PyInstaller → SuiviCommandes.exe
+        run: pyinstaller build_windows.spec --clean --noconfirm
+
+      - name: Inno Setup → installateur
+        uses: Minionguyjpro/Inno-Setup-Action@v1.2.2
+        with:
+          path: installer_windows.iss
+          options: /O+ /F"SuiviCommandes_Setup_Windows"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SuiviCommandes_Windows
+          path: Output/SuiviCommandes_Setup_Windows.exe
+          retention-days: 90
+
+  # ─────────────────────────────────────────────
+  #  macOS  →  SuiviCommandes_macOS.dmg
+  # ─────────────────────────────────────────────
+  build-macos:
+    name: "🍎 Build macOS"
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Installer les dépendances
+        run: |
+          pip install --upgrade pip
+          pip install flask pandas pyinstaller pillow
+
+      - name: Générer les icônes (ico + icns)
+        run: python make_icon.py
+
+      - name: PyInstaller → SuiviCommandes.app
+        run: pyinstaller build_macos.spec --clean --noconfirm
+
+      - name: Créer le DMG
+        run: |
+          # Dossier de staging pour le DMG
+          mkdir -p dist/dmg
+          cp -r "dist/SuiviCommandes.app" dist/dmg/
+
+          # Créer un lien symbolique vers /Applications (drag & drop classique)
+          ln -s /Applications dist/dmg/Applications
+
+          hdiutil create \
+            -volname "Suivi Commandes SPACE" \
+            -srcfolder dist/dmg \
+            -ov \
+            -format UDZO \
+            dist/SuiviCommandes_macOS.dmg
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SuiviCommandes_macOS
+          path: dist/SuiviCommandes_macOS.dmg
+          retention-days: 90
+
+  # ─────────────────────────────────────────────
+  #  RELEASE (uniquement sur tag)
+  # ─────────────────────────────────────────────
+  release:
+    name: "🚀 GitHub Release"
+    needs: [build-windows, build-macos]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+
+    steps:
+      - name: Télécharger les artifacts Windows
+        uses: actions/download-artifact@v4
+        with:
+          name: SuiviCommandes_Windows
+          path: release/
+
+      - name: Télécharger les artifacts macOS
+        uses: actions/download-artifact@v4
+        with:
+          name: SuiviCommandes_macOS
+          path: release/
+
+      - name: Créer la Release GitHub
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "Suivi Commandes SPACE ${{ github.ref_name }}"
+          body: |
+            ## Suivi Commandes SPACE ${{ github.ref_name }}
+
+            ### Téléchargements
+
+            | Plateforme | Fichier |
+            |------------|---------|
+            | 🪟 Windows 10/11 | `SuiviCommandes_Setup_Windows.exe` |
+            | 🍎 macOS 11+ | `SuiviCommandes_macOS.dmg` |
+
+            ### Installation
+
+            **Windows** : double-cliquer sur `SuiviCommandes_Setup_Windows.exe` → suivre l'assistant → raccourci créé sur le bureau.
+
+            **macOS** : ouvrir `SuiviCommandes_macOS.dmg` → glisser l'app dans Applications → double-cliquer.
+
+            > Les données (commandes, presets) sont sauvegardées localement dans le dossier utilisateur et ne sont pas effacées lors d'une mise à jour.
+          files: |
+            release/SuiviCommandes_Setup_Windows.exe
+            release/SuiviCommandes_macOS.dmg
+          draft: false
+          prerelease: false

@@ -1,20 +1,48 @@
-#!/opt/homebrew/bin/python3
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-from flask import Flask, render_template, jsonify, request
-import pandas as pd
+import sys
 import os
 import glob
 import json
+import logging
 from datetime import datetime
 
-app = Flask(__name__, template_folder="templates")
-# Répertoire des données : env SUIVI_DATA (défini par le lanceur .app)
-# ou ~/Library/Application Support/SuiviCommandes en mode app
-# ou le dossier du script en mode développement
-_default_data = os.path.expanduser("~/Library/Application Support/SuiviCommandes")
-DOSSIER = os.environ.get("SUIVI_DATA", _default_data)
+import pandas as pd
+from flask import Flask, render_template, jsonify, request
+
+# ── Chemins de base (gère le mode "frozen" PyInstaller) ──────
+if getattr(sys, "frozen", False):
+    # App compilée : ressources dans le répertoire temporaire de PyInstaller
+    BASE_DIR = sys._MEIPASS
+else:
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# ── Répertoire des données utilisateur ───────────────────────
+def _get_data_dir():
+    if os.environ.get("SUIVI_DATA"):
+        return os.environ["SUIVI_DATA"]
+    if getattr(sys, "frozen", False):
+        if sys.platform == "win32":
+            base = os.environ.get("LOCALAPPDATA", os.path.expanduser("~"))
+        else:
+            base = os.path.expanduser("~/Library/Application Support")
+        return os.path.join(base, "SuiviCommandes")
+    # Mode développement : dossier du script
+    return os.path.dirname(os.path.abspath(__file__))
+
+DOSSIER = _get_data_dir()
 os.makedirs(DOSSIER, exist_ok=True)
+
+# ── Logging vers fichier quand compilé ───────────────────────
+if getattr(sys, "frozen", False):
+    logging.basicConfig(
+        filename=os.path.join(DOSSIER, "app.log"),
+        level=logging.WARNING,
+        format="%(asctime)s %(levelname)s %(message)s",
+    )
+
+app = Flask(__name__, template_folder=os.path.join(BASE_DIR, "templates"))
 STATUT_COL = "Statut Traitement"
 STATUTS = ["A faire", "En cours", "Traité"]
 MASTER_FILE    = "suivi_master.csv"
@@ -143,9 +171,10 @@ def normaliser_expose(chemin):
 # ── Produits & Presets ────────────────────────────────────────
 
 def _ref_path():
-    """Cherche le fichier de référence produits dans DOSSIER puis à côté du script."""
+    """Cherche le fichier de référence produits : données > bundle > script."""
     for p in [
         os.path.join(DOSSIER, PRODUCTS_REF),
+        os.path.join(BASE_DIR, PRODUCTS_REF),          # bundlé par PyInstaller
         os.path.join(os.path.dirname(os.path.abspath(__file__)), PRODUCTS_REF),
     ]:
         if os.path.exists(p):
@@ -407,14 +436,46 @@ def api_delete_preset(name):
     return jsonify({"ok": True})
 
 
+def find_free_port(start=5050):
+    import socket
+    for port in range(start, start + 20):
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            try:
+                s.bind(("127.0.0.1", port))
+                return port
+            except OSError:
+                continue
+    return start
+
+
 if __name__ == "__main__":
-    init_presets()
     import webbrowser, threading, time
-    def ouvrir(): time.sleep(1); webbrowser.open("http://127.0.0.1:5050")
+    init_presets()
+
+    PORT = find_free_port(5050)
+    URL  = f"http://127.0.0.1:{PORT}"
+
+    def ouvrir():
+        time.sleep(1.5)
+        webbrowser.open(URL)
+
     threading.Thread(target=ouvrir, daemon=True).start()
-    print("\n" + "="*50)
-    print("  Suivi Commandes — Interface locale")
-    print("  http://127.0.0.1:5050")
-    print("  Ctrl+C pour arrêter")
-    print("="*50 + "\n")
-    app.run(port=5050, debug=False)
+
+    frozen = getattr(sys, "frozen", False)
+
+    if not frozen:
+        print(f"\n{'='*50}")
+        print("  Suivi Commandes — Interface locale")
+        print(f"  {URL}")
+        print("  Ctrl+C pour arrêter")
+        print(f"{'='*50}\n")
+
+    # Waitress (serveur de production) quand compilé sur Windows
+    if frozen and sys.platform == "win32":
+        try:
+            from waitress import serve
+            serve(app, host="127.0.0.1", port=PORT, threads=4)
+        except Exception as e:
+            logging.error(f"Waitress error: {e}")
+    else:
+        app.run(host="127.0.0.1", port=PORT, debug=False)
