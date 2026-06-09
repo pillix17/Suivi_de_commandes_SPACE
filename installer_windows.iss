@@ -21,7 +21,7 @@ SetupIconFile=icon.ico
 Compression=lzma2/ultra64
 SolidCompression=yes
 WizardStyle=modern
-WizardSmallImageFile=icon.ico
+WizardSmallImageFile=wizard_small.bmp
 UninstallDisplayIcon={app}\{#AppExeName}
 UninstallDisplayName={#AppName}
 ; Pas de droits admin - installation dans AppData

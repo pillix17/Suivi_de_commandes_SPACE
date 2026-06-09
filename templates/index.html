@@ -644,6 +644,7 @@ function renderProduits(recs,container){
     const [code,label]=key_.split("||");
     const key=`prd:${key_}`;
     const companies=new Set(lines.map(l=>l["Société / Client"]));
+    const ncds=new Set(lines.map(l=>l["N° Commande"])).size;
     const totalQty=lines.reduce((s,l)=>s+(parseFloat(l["Quantité"])||0),0);
     const ht=sumHT(lines);
     const isOpen=openCards.has(key)||autoOpen;
@@ -652,26 +653,11 @@ function renderProduits(recs,container){
         <span class="chevron">▶</span>
         <span class="badge n">${esc(code)}</span>
         <span class="card-title">${esc(label)}</span>
-        <span class="card-meta">${companies.size} entreprise${companies.size>1?"s":" "}${totalQty?` · qté ${totalQty}`:""}</span>
+        <span class="card-meta">${companies.size} entreprise${companies.size>1?"s":""} · ${ncds} commande${ncds>1?"s":""}${totalQty?` · qté ${totalQty}`:""}</span>
         ${ssBadges(lines)}
         ${ht>0?`<span class="card-ht">${fmtEUR(ht)}</span>`:""}
       </div>
-      <div class="card-body${isOpen?" open":""}">
-        <div class="company-rows">`;
-    const byComp=groupBy(lines,"Société / Client");
-    for(const [comp,cLines] of byComp){
-      const orders=[...new Set(cLines.map(l=>l["N° Commande"]))].join(", ");
-      const qty=cLines.reduce((s,l)=>s+(parseFloat(l["Quantité"])||0),0);
-      const cHT=sumHT(cLines);
-      html+=`<div class="company-row">
-        <span class="cr-name">${esc(comp)}</span>
-        <span class="cr-order">${esc(orders)}</span>
-        <span class="cr-qty">${qty?`qté ${qty}`:""}</span>
-        <span class="cr-ht">${cHT>0?fmtEUR(cHT):""}</span>
-        ${ssBadges(cLines)}
-      </div>`;
-    }
-    html+=`</div>`;
+      <div class="card-body${isOpen?" open":""}">`;
     html+=ptable(lines,["Société / Client","N° Commande","Quantité","Total HT","Statut Traitement"]);
     html+=`</div></div>`;
   }
