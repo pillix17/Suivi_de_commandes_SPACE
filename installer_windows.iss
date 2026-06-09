@@ -1,4 +1,4 @@
-; Inno Setup Script — Suivi Commandes SPACE
+; Inno Setup Script - Suivi Commandes SPACE
 ; https://jrsoftware.org/ishelp/
 
 #define AppName      "Suivi Commandes SPACE"
@@ -24,7 +24,7 @@ WizardStyle=modern
 WizardSmallImageFile=icon.ico
 UninstallDisplayIcon={app}\{#AppExeName}
 UninstallDisplayName={#AppName}
-; Pas besoin de droits admin — installation dans AppData
+; Pas de droits admin - installation dans AppData
 PrivilegesRequiredOverridesAllowed=commandline
 
 [Languages]
@@ -32,9 +32,8 @@ Name: "french"; MessagesFile: "compiler:Languages\French.isl"
 
 [Tasks]
 Name: "desktopicon"; \
-  Description: "Créer une icône sur le {commondesktop}"; \
-  GroupDescription: "Icônes supplémentaires :"; \
-  Flags: checked
+  Description: "Creer une icone sur le Bureau"; \
+  GroupDescription: "Icones supplementaires :"
 
 [Files]
 Source: "dist\{#AppExeName}"; \
@@ -47,20 +46,20 @@ Name: "{commondesktop}\{#AppName}"; \
   Filename: "{app}\{#AppExeName}"; \
   Tasks: desktopicon
 
-; Menu Démarrer
+; Menu Demarrer
 Name: "{userprograms}\{#AppName}\{#AppName}"; \
   Filename: "{app}\{#AppExeName}"
-Name: "{userprograms}\{#AppName}\Désinstaller {#AppName}"; \
+Name: "{userprograms}\{#AppName}\Desinstaller {#AppName}"; \
   Filename: "{uninstallexe}"
 
 [Run]
-; Proposer de lancer l'app à la fin de l'installation
+; Proposer de lancer l'app a la fin de l'installation
 Filename: "{app}\{#AppExeName}"; \
   Description: "Lancer {#AppName}"; \
   Flags: nowait postinstall skipifsilent
 
 [UninstallRun]
-; Fermer l'application avant désinstallation
+; Fermer l'application avant desinstallation
 Filename: "taskkill"; \
   Parameters: "/F /IM {#AppExeName}"; \
   Flags: runhidden waituntilterminated
