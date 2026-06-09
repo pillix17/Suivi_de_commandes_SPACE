@@ -1,0 +1,17 @@
+# Données brutes (exports sources, fichiers CSV volumineux)
+Export Klipso.csv
+Export Expose.csv
+commandes_normalisees_*.csv
+suivi_master.csv
+import_history.json
+
+# Fichiers temporaires
+_temp_*.csv
+
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+*.pyc
+*.pyo

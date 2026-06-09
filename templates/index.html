@@ -1,0 +1,853 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Suivi Commandes</title>
+<style>
+:root {
+  --bg: #f1f5f9;
+  --surface: #ffffff;
+  --border: #e2e8f0;
+  --border-light: #f1f5f9;
+  --accent: #3b82f6;
+  --accent-bg: #eff6ff;
+  --text: #0f172a;
+  --muted: #64748b;
+  --muted2: #94a3b8;
+  --green: #16a34a; --green-bg: #f0fdf4; --green-border: #bbf7d0;
+  --amber: #d97706; --amber-bg: #fffbeb; --amber-border: #fde68a;
+  --red: #dc2626; --red-bg: #fef2f2; --red-border: #fecaca;
+  --header-h: 58px;
+  --toolbar-h: 52px;
+  --radius: 10px;
+  --shadow: 0 1px 3px rgba(0,0,0,.07), 0 1px 2px rgba(0,0,0,.04);
+  --shadow-md: 0 4px 6px -1px rgba(0,0,0,.07), 0 2px 4px -2px rgba(0,0,0,.05);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);font-size:13px;line-height:1.5}
+a{color:inherit;text-decoration:none}
+
+/* ── HEADER ── */
+#header{position:sticky;top:0;z-index:200;background:#0f172a;height:var(--header-h);display:flex;align-items:center;gap:16px;padding:0 20px;box-shadow:0 2px 8px rgba(0,0,0,.25)}
+#header h1{font-size:15px;font-weight:700;color:#f8fafc;white-space:nowrap;letter-spacing:-.2px}
+#header h1 span{color:#60a5fa}
+.hfile{display:flex;align-items:center;gap:6px;color:#94a3b8;font-size:12px}
+.hfile select{background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:6px;padding:4px 8px;font-size:12px;cursor:pointer}
+.hfile select:focus{outline:none;border-color:#60a5fa}
+#statsBar{display:flex;gap:16px;font-size:12px;color:#94a3b8;margin-left:auto;flex-wrap:wrap}
+#statsBar b{color:#f1f5f9}
+#statsBar .sep{color:#334155}
+.btn-import{background:#3b82f6;color:white;border:none;border-radius:7px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;transition:background .15s;flex-shrink:0}
+.btn-import:hover{background:#2563eb}
+.btn-import.open{background:#1d4ed8}
+
+/* ── IMPORT DRAWER ── */
+#importDrawer{background:#1e293b;border-bottom:1px solid #334155;overflow:hidden;max-height:0;transition:max-height .35s ease}
+#importDrawer.open{max-height:220px}
+#importDrawer.open.history-open{max-height:600px}
+.import-inner{padding:16px 20px;display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap}
+.dropzone{flex:1;min-width:200px;border:2px dashed #334155;border-radius:8px;padding:14px 16px;cursor:pointer;transition:border-color .15s;position:relative}
+.dropzone:hover,.dropzone.over{border-color:#60a5fa;background:#172133}
+.dropzone input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.dropzone .dz-label{font-size:12px;font-weight:600;color:#60a5fa;margin-bottom:2px}
+.dropzone .dz-hint{font-size:11px;color:#64748b}
+.dropzone .dz-file{font-size:11px;color:#22c55e;margin-top:4px;font-weight:500}
+.btn-run{background:#22c55e;color:#0f172a;border:none;border-radius:7px;padding:8px 18px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;align-self:flex-end;transition:background .15s}
+.btn-run:hover{background:#16a34a;color:white}
+.btn-run:disabled{opacity:.5;cursor:not-allowed}
+#importResult{font-size:12px;color:#94a3b8;align-self:flex-end;padding-bottom:2px;transition:opacity .4s}
+#importResult.ok{color:#4ade80}
+#importResult.err{color:#f87171}
+#importResult.fade{opacity:0}
+.btn-history{background:transparent;color:#64748b;border:1px solid #334155;border-radius:7px;padding:7px 12px;font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap;align-self:flex-end;transition:all .15s}
+.btn-history:hover{color:#94a3b8;border-color:#475569}
+.btn-history.active{color:#60a5fa;border-color:#3b82f6}
+#historyPanel{display:none;border-top:1px solid #1e3a5f;padding:12px 20px 16px;background:#172133}
+#historyPanel.open{display:block}
+#historyPanel h3{font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px}
+.hist-table{width:100%;border-collapse:collapse;font-size:11px}
+.hist-table th{color:#475569;font-weight:600;padding:4px 8px;text-align:left;border-bottom:1px solid #1e3a5f}
+.hist-table td{padding:6px 8px;border-bottom:1px solid #1a2d42;color:#94a3b8;vertical-align:middle}
+.hist-table tr:last-child td{border-bottom:none}
+.hist-table .date{color:#60a5fa;font-variant-numeric:tabular-nums;white-space:nowrap}
+.hist-table .new{color:#4ade80;font-weight:600}
+.hist-table .skip{color:#f87171}
+.hist-src{display:flex;gap:3px}
+.hist-empty{color:#475569;font-size:12px;padding:8px 0}
+
+/* ── TOOLBAR ── */
+#toolbar{position:sticky;top:var(--header-h);z-index:100;background:white;border-bottom:1px solid var(--border);height:var(--toolbar-h);display:flex;align-items:center;gap:10px;padding:0 20px;box-shadow:var(--shadow)}
+.search-wrap{position:relative;flex:1;max-width:360px}
+.search-wrap input{width:100%;padding:7px 10px 7px 32px;border:1px solid var(--border);border-radius:7px;font-size:13px;background:var(--bg);transition:all .15s}
+.search-wrap input:focus{outline:none;border-color:var(--accent);background:white;box-shadow:0 0 0 3px rgba(59,130,246,.1)}
+.search-ico{position:absolute;left:9px;top:50%;transform:translateY(-50%);color:var(--muted2);font-size:14px;pointer-events:none}
+.clear-btn{position:absolute;right:8px;top:50%;transform:translateY(-50%);color:var(--muted2);background:none;border:none;cursor:pointer;font-size:14px;padding:2px;display:none}
+.clear-btn.show{display:block}
+.tabs{display:flex;gap:2px;background:var(--bg);border-radius:8px;padding:3px}
+.tab{padding:5px 12px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;color:var(--muted);border:none;background:transparent;transition:all .15s;white-space:nowrap}
+.tab.active{background:white;color:var(--accent);box-shadow:0 1px 3px rgba(0,0,0,.1)}
+.tab:hover:not(.active){color:var(--text)}
+.sf-wrap{display:flex;gap:3px}
+.sf{padding:5px 10px;border-radius:6px;border:1px solid var(--border);background:white;cursor:pointer;font-size:11px;font-weight:600;color:var(--muted);transition:all .15s;white-space:nowrap}
+.sf.active[data-s="A faire"]{color:var(--red);background:var(--red-bg);border-color:var(--red-border)}
+.sf.active[data-s="En cours"]{color:var(--amber);background:var(--amber-bg);border-color:var(--amber-border)}
+.sf.active[data-s="Traité"]{color:var(--green);background:var(--green-bg);border-color:var(--green-border)}
+.sf.active[data-s="all"]{color:var(--accent);background:var(--accent-bg);border-color:#bfdbfe}
+
+/* ── CONTENT ── */
+#content{max-width:1280px;margin:0 auto;padding:16px}
+#countBar{font-size:12px;color:var(--muted);margin-bottom:14px;display:flex;align-items:center;gap:8px}
+#countBar strong{color:var(--text)}
+#countBar .total-ht{margin-left:auto;font-weight:700;color:var(--text);font-size:13px}
+
+/* ── CARDS ── */
+.cards{display:flex;flex-direction:column;gap:8px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden}
+.card-header{padding:12px 16px;display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none;transition:background .1s}
+.card-header:hover{background:#fafafa}
+.chevron{color:var(--muted2);font-size:10px;transition:transform .2s;flex-shrink:0;width:16px}
+.card-header.open .chevron{transform:rotate(90deg)}
+.card-title{font-weight:600;font-size:13px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.card-meta{font-size:11px;color:var(--muted);flex-shrink:0;white-space:nowrap}
+.card-ht{font-size:12px;font-weight:700;color:var(--text);flex-shrink:0;white-space:nowrap}
+.status-summary{display:flex;gap:4px;flex-shrink:0}
+.ss-pill{font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px}
+.ss-pill.traite{color:var(--green);background:var(--green-bg)}
+.ss-pill.en-cours{color:var(--amber);background:var(--amber-bg)}
+.ss-pill.a-faire{color:var(--red);background:var(--red-bg)}
+.btn-all{font-size:10px;font-weight:600;padding:3px 8px;border-radius:5px;border:1px solid var(--border);background:white;cursor:pointer;color:var(--muted);transition:all .15s;flex-shrink:0;white-space:nowrap}
+.btn-all:hover{background:var(--green-bg);color:var(--green);border-color:var(--green-border)}
+
+.card-body{display:none;border-top:1px solid var(--border)}
+.card-body.open{display:block}
+
+/* Contact strip */
+.contact-strip{display:flex;gap:20px;flex-wrap:wrap;padding:8px 16px;background:var(--bg);font-size:11px;color:var(--muted);border-bottom:1px solid var(--border)}
+.contact-strip span{display:flex;align-items:center;gap:4px}
+.contact-strip b{color:var(--text)}
+
+/* Sub-order title (in entreprise view) */
+.sub-orders{padding:0 16px 12px}
+.sub-order-header{display:flex;align-items:center;gap:8px;padding:10px 0 6px;border-top:1px solid var(--border-light);margin-top:8px;font-size:11px;color:var(--muted);font-weight:600}
+.sub-order-header:first-child{border-top:none;margin-top:0}
+
+/* Product table */
+.ptable{width:100%;border-collapse:collapse}
+.ptable th{padding:7px 12px;background:var(--bg);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);text-align:left;border-bottom:1px solid var(--border);white-space:nowrap}
+.ptable th.r{text-align:right}
+.ptable td{padding:9px 12px;border-bottom:1px solid var(--border-light);vertical-align:middle;font-size:12px}
+.ptable td.r{text-align:right;font-variant-numeric:tabular-nums}
+.ptable tr:last-child td{border-bottom:none}
+.ptable tbody tr:hover td{background:#fafafe}
+.ptable .code-cell{font-family:ui-monospace,monospace;font-size:11px;color:var(--muted)}
+.ptable .label-cell{max-width:280px}
+.ptable .ht-cell{font-variant-numeric:tabular-nums;color:var(--text);font-weight:500}
+
+/* Company rows (product view) */
+.company-rows{padding:4px 16px 12px}
+.company-row{display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:7px;font-size:12px}
+.company-row:hover{background:var(--bg)}
+.cr-name{flex:1;font-weight:500}
+.cr-order{color:var(--muted);font-size:11px;font-family:ui-monospace,monospace}
+.cr-qty{color:var(--muted);font-size:11px;width:60px;text-align:right}
+.cr-ht{font-weight:600;width:90px;text-align:right;font-size:11px}
+
+/* Status select */
+.sselect{padding:3px 6px;border-radius:5px;border:1px solid transparent;font-size:11px;font-weight:700;cursor:pointer;appearance:none;text-align:center;transition:all .15s}
+.sselect:focus{outline:none}
+.sselect.traite{color:var(--green);background:var(--green-bg);border-color:var(--green-border)}
+.sselect.en-cours{color:var(--amber);background:var(--amber-bg);border-color:var(--amber-border)}
+.sselect.a-faire{color:var(--red);background:var(--red-bg);border-color:var(--red-border)}
+
+/* Source badges */
+.badge{display:inline-flex;align-items:center;padding:2px 7px;border-radius:4px;font-size:10px;font-weight:700;white-space:nowrap;letter-spacing:.02em}
+.badge.k{color:#7c3aed;background:#f5f3ff}
+.badge.e{color:#0369a1;background:#f0f9ff}
+.badge.n{color:var(--muted);background:var(--bg)}
+.badge.s-confirme{color:var(--green);background:var(--green-bg)}
+.badge.s-autre{color:var(--muted);background:var(--bg)}
+
+/* ── TABLEAU VIEW ── */
+.table-wrap{overflow-x:auto}
+table.flat{width:100%;border-collapse:collapse;font-size:12px}
+table.flat thead{}
+table.flat th{padding:8px 12px;background:#f8fafc;border-bottom:2px solid var(--border);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);white-space:nowrap;cursor:pointer;user-select:none;transition:background .1s}
+table.flat th:hover{background:#f1f5f9;color:var(--text)}
+table.flat th.sorted{color:var(--accent)}
+table.flat th .sort-ico{margin-left:3px;opacity:.5}
+table.flat th.sorted .sort-ico{opacity:1}
+table.flat td{padding:8px 12px;border-bottom:1px solid var(--border-light);vertical-align:middle;white-space:nowrap}
+table.flat tbody tr:hover td{background:#f8faff}
+table.flat td.wrap{white-space:normal;max-width:240px}
+table.flat td.mono{font-family:ui-monospace,monospace;font-size:11px}
+table.flat td.num{text-align:right;font-variant-numeric:tabular-nums}
+.flat-pagination{display:flex;align-items:center;justify-content:center;gap:8px;padding:14px;border-top:1px solid var(--border);font-size:12px;color:var(--muted)}
+.page-btn{padding:4px 10px;border:1px solid var(--border);border-radius:6px;background:white;cursor:pointer;font-size:12px;color:var(--text);transition:all .15s}
+.page-btn:hover:not(:disabled){background:var(--accent);color:white;border-color:var(--accent)}
+.page-btn:disabled{opacity:.4;cursor:not-allowed}
+.page-info{color:var(--muted);font-size:12px}
+
+/* ── MISC ── */
+.empty{text-align:center;padding:56px;color:var(--muted);font-size:14px}
+.loading{text-align:center;padding:56px;color:var(--muted)}
+.spinner{display:inline-block;width:18px;height:18px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;margin-right:8px;vertical-align:middle}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+#toast{position:fixed;bottom:20px;right:20px;background:#0f172a;color:white;padding:9px 16px;border-radius:8px;font-size:12px;font-weight:500;opacity:0;transform:translateY(6px);transition:all .25s;pointer-events:none;z-index:999}
+#toast.show{opacity:1;transform:translateY(0)}
+
+.highlight{background:#fef9c3}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div id="header">
+  <h1>Suivi <span>Commandes</span></h1>
+  <div class="hfile">
+    <span>Fichier :</span>
+    <select id="fileSelect">
+      {% for csv in csvs %}<option value="{{ csv }}">{{ csv }}</option>{% endfor %}
+    </select>
+  </div>
+  <div id="statsBar">—</div>
+  <button class="btn-import" id="btnImport">↑ Importer CSV</button>
+</div>
+
+<!-- IMPORT DRAWER -->
+<div id="importDrawer">
+  <div class="import-inner">
+    <div class="dropzone" id="dzKlipso">
+      <input type="file" id="fileKlipso" accept=".csv">
+      <div class="dz-label">KLIPSO</div>
+      <div class="dz-hint">Glissez l'export Klipso ici ou cliquez</div>
+      <div class="dz-file" id="nameKlipso"></div>
+    </div>
+    <div class="dropzone" id="dzExpose">
+      <input type="file" id="fileExpose" accept=".csv">
+      <div class="dz-label">EXPOSE</div>
+      <div class="dz-hint">Glissez l'export Expose ici ou cliquez</div>
+      <div class="dz-file" id="nameExpose"></div>
+    </div>
+    <button class="btn-run" id="btnRun" disabled>Normaliser et<br>importer</button>
+    <div id="importResult"></div>
+    <button class="btn-history" id="btnHistory">📋 Historique</button>
+  </div>
+  <div id="historyPanel">
+    <h3>Historique des imports</h3>
+    <div id="historyContent"><span class="hist-empty">Chargement…</span></div>
+  </div>
+</div>
+
+<!-- TOOLBAR -->
+<div id="toolbar">
+  <div class="search-wrap">
+    <span class="search-ico">🔍</span>
+    <input type="text" id="searchInput" placeholder="Commande, entreprise, produit, contact…">
+    <button class="clear-btn" id="clearSearch">✕</button>
+  </div>
+  <div class="tabs">
+    <button class="tab" data-tab="tableau">Tableau</button>
+    <button class="tab active" data-tab="commande">Commandes</button>
+    <button class="tab" data-tab="entreprise">Entreprises</button>
+    <button class="tab" data-tab="produit">Produits</button>
+  </div>
+  <div class="sf-wrap">
+    <button class="sf active" data-s="all">Tous</button>
+    <button class="sf" data-s="A faire">À faire</button>
+    <button class="sf" data-s="En cours">En cours</button>
+    <button class="sf" data-s="Traité">Traité</button>
+  </div>
+</div>
+
+<div id="content">
+  <div id="countBar"></div>
+  <div id="results"><div class="loading"><span class="spinner"></span>Chargement…</div></div>
+</div>
+<div id="toast"></div>
+
+<script>
+// ── STATE ────────────────────────────────────────────────────
+let allRecords = [];
+let currentFile = "";
+let currentTab = "commande";
+let searchQuery = "";
+let filterStatut = "all";
+let openCards = new Set();
+let sortCol = "Date Commande";
+let sortDir = "desc";
+let flatPage = 1;
+const PAGE_SIZE = 150;
+
+const STATUTS = ["A faire", "En cours", "Traité"];
+
+// ── FORMAT HELPERS ───────────────────────────────────────────
+function esc(s){ return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;") }
+function fmtEUR(v){
+  const n = parseFloat(v);
+  if(isNaN(n)||n===0) return "—";
+  return new Intl.NumberFormat("fr-FR",{style:"currency",currency:"EUR",maximumFractionDigits:0}).format(n);
+}
+function fmtDate(d){ return d?(d.split(" ")[0]):"" }
+function scl(s){ return s==="Traité"?"traite":s==="En cours"?"en-cours":"a-faire" }
+
+function ssBadges(lines){
+  const t = lines.filter(l=>l["Statut Traitement"]==="Traité").length;
+  const e = lines.filter(l=>l["Statut Traitement"]==="En cours").length;
+  const a = lines.filter(l=>l["Statut Traitement"]==="A faire").length;
+  let h="";
+  if(t) h+=`<span class="ss-pill traite">✓ ${t}</span>`;
+  if(e) h+=`<span class="ss-pill en-cours">↻ ${e}</span>`;
+  if(a) h+=`<span class="ss-pill a-faire">● ${a}</span>`;
+  return `<div class="status-summary">${h}</div>`;
+}
+function sumHT(lines){
+  return lines.reduce((s,l)=>s+(parseFloat(l["Total HT"])||0),0);
+}
+function srcBadge(s){ return `<span class="badge ${s==="Klipso"?"k":"e"}">${esc(s)}</span>` }
+function statutBadge(s){
+  const cls = (s||"").toLowerCase().includes("confirm")?"s-confirme":"s-autre";
+  return `<span class="badge ${cls}">${esc(s)}</span>`;
+}
+function contact(r){
+  const nom = [r["Contact Prénom"],r["Contact Nom"]].filter(Boolean).join(" ");
+  return {nom:nom||"", email:r["Contact Email"]||"", mobile:r["Contact Mobile"]||""};
+}
+function sselect(s,idx){
+  const sc=scl(s);
+  const opts=STATUTS.map(x=>`<option${x===s?" selected":""}>${esc(x)}</option>`).join("");
+  return `<select class="sselect ${sc}" data-idx="${idx}" onchange="onStatut(this)">${opts}</select>`;
+}
+function groupBy(arr,fn){
+  const m=new Map();
+  for(const x of arr){ const k=typeof fn==="function"?fn(x):x[fn]; if(!m.has(k))m.set(k,[]); m.get(k).push(x); }
+  return m;
+}
+
+// ── FILTER ───────────────────────────────────────────────────
+function filtered(){
+  let r=allRecords;
+  const q=searchQuery.toLowerCase().trim();
+  if(q) r=r.filter(x=>
+    (x["N° Commande"]||"").toLowerCase().includes(q)||
+    (x["Société / Client"]||"").toLowerCase().includes(q)||
+    (x["Code Produit"]||"").toLowerCase().includes(q)||
+    (x["Libellé Produit"]||"").toLowerCase().includes(q)||
+    (x["Contact Nom"]||"").toLowerCase().includes(q)||
+    (x["Contact Prénom"]||"").toLowerCase().includes(q)
+  );
+  if(filterStatut!=="all") r=r.filter(x=>x["Statut Traitement"]===filterStatut);
+  return r;
+}
+
+// ── STATS BAR ─────────────────────────────────────────────────
+function updateStats(){
+  const r=allRecords;
+  const t=r.filter(x=>x["Statut Traitement"]==="Traité").length;
+  const e=r.filter(x=>x["Statut Traitement"]==="En cours").length;
+  const a=r.filter(x=>x["Statut Traitement"]==="A faire").length;
+  const ht=sumHT(r);
+  document.getElementById("statsBar").innerHTML=
+    `<span><b>${r.length.toLocaleString("fr")}</b> lignes</span>
+     <span class="sep">·</span>
+     <span><b>${new Set(r.map(x=>x["N° Commande"])).size}</b> commandes</span>
+     <span class="sep">·</span>
+     <span><b>${new Set(r.map(x=>x["Société / Client"])).size}</b> entreprises</span>
+     <span class="sep">·</span>
+     <span style="color:#4ade80"><b>${t}</b> Traités</span>
+     <span style="color:#fbbf24"><b>${e}</b> En cours</span>
+     <span style="color:#f87171"><b>${a}</b> À faire</span>
+     <span class="sep">·</span>
+     <span><b>${fmtEUR(ht)}</b> HT total</span>`;
+}
+
+// ── COUNT BAR ────────────────────────────────────────────────
+function updateCountBar(recs){
+  const bar=document.getElementById("countBar");
+  if(!recs.length){ bar.innerHTML=""; return; }
+  const ht=sumHT(recs);
+  let info="";
+  if(currentTab==="tableau") info=`<strong>${recs.length.toLocaleString("fr")}</strong> lignes`;
+  else if(currentTab==="commande"){
+    const nc=new Set(recs.map(x=>x["N° Commande"])).size;
+    info=`<strong>${nc}</strong> commande${nc>1?"s":""} · <strong>${recs.length.toLocaleString("fr")}</strong> lignes`;
+  } else if(currentTab==="entreprise"){
+    const ne=new Set(recs.map(x=>x["Société / Client"])).size;
+    const nc=new Set(recs.map(x=>x["N° Commande"])).size;
+    info=`<strong>${ne}</strong> entreprise${ne>1?"s":""} · <strong>${nc}</strong> commande${nc>1?"s":""} · <strong>${recs.length.toLocaleString("fr")}</strong> lignes`;
+  } else {
+    const np=new Set(recs.map(x=>x["Code Produit"])).size;
+    info=`<strong>${np}</strong> produit${np>1?"s":""} · <strong>${recs.length.toLocaleString("fr")}</strong> lignes`;
+  }
+  const htStr = ht>0?`<span class="total-ht">${fmtEUR(ht)} HT</span>`:"";
+  bar.innerHTML=`${info} ${htStr}`;
+}
+
+// ── LOAD ─────────────────────────────────────────────────────
+async function loadData(file){
+  document.getElementById("results").innerHTML='<div class="loading"><span class="spinner"></span>Chargement…</div>';
+  const r=await fetch(`/api/data?fichier=${encodeURIComponent(file)}`);
+  const data=await r.json();
+  allRecords=data.records;
+  currentFile=data.fichier;
+  flatPage=1;
+  updateStats();
+  render();
+}
+
+// ── RENDER ───────────────────────────────────────────────────
+function render(){
+  const recs=filtered();
+  updateCountBar(recs);
+  const container=document.getElementById("results");
+  if(!recs.length){ container.innerHTML='<div class="empty">Aucun résultat pour cette recherche</div>'; return; }
+  if(currentTab==="tableau") renderTableau(recs,container);
+  else if(currentTab==="commande") renderCommandes(recs,container);
+  else if(currentTab==="entreprise") renderEntreprises(recs,container);
+  else renderProduits(recs,container);
+  restoreOpen();
+}
+
+// ── TABLEAU ──────────────────────────────────────────────────
+const FLAT_COLS=[
+  {k:"Source",l:"Source",w:70},
+  {k:"N° Commande",l:"N° Cde",w:100,mono:true},
+  {k:"Date Commande",l:"Date",w:85},
+  {k:"Société / Client",l:"Société",w:180,wrap:true},
+  {k:"Code Produit",l:"Code",w:90,mono:true},
+  {k:"Libellé Produit",l:"Libellé",w:220,wrap:true},
+  {k:"Quantité",l:"Qté",w:45,r:true},
+  {k:"Total HT",l:"Total HT",w:90,r:true,num:true},
+  {k:"Statut",l:"St. source",w:90},
+  {k:"Statut Traitement",l:"Traitement",w:110},
+];
+
+function renderTableau(recs,container){
+  const sorted=[...recs].sort((a,b)=>{
+    let va=a[sortCol]||"", vb=b[sortCol]||"";
+    if(sortCol==="Total HT"||sortCol==="Quantité"){ va=parseFloat(va)||0; vb=parseFloat(vb)||0; return sortDir==="asc"?va-vb:vb-va; }
+    return sortDir==="asc"?va.localeCompare(vb,"fr"):vb.localeCompare(va,"fr");
+  });
+  const total=sorted.length;
+  const pages=Math.ceil(total/PAGE_SIZE);
+  flatPage=Math.min(flatPage,pages);
+  const slice=sorted.slice((flatPage-1)*PAGE_SIZE, flatPage*PAGE_SIZE);
+
+  let th=FLAT_COLS.map(c=>{
+    const sorted_=c.k===sortCol;
+    const ico=sorted_?(sortDir==="asc"?"▲":"▼"):"↕";
+    return `<th class="${sorted_?"sorted":""} ${c.r?"r":""}" onclick="setSort('${c.k}')" style="min-width:${c.w}px">${esc(c.l)}<span class="sort-ico">${ico}</span></th>`;
+  }).join("");
+
+  let rows=slice.map(r=>{
+    return `<tr>${FLAT_COLS.map(c=>{
+      if(c.k==="Source") return `<td>${srcBadge(r[c.k])}</td>`;
+      if(c.k==="Statut") return `<td>${statutBadge(r[c.k])}</td>`;
+      if(c.k==="Statut Traitement") return `<td>${sselect(r[c.k],r["_index"])}</td>`;
+      if(c.k==="Total HT"||c.k==="Quantité") return `<td class="num">${c.k==="Total HT"?fmtEUR(r[c.k]):esc(r[c.k])}</td>`;
+      const cls=[c.mono?"mono":"",c.wrap?"wrap":"",c.r?"r":""].filter(Boolean).join(" ");
+      return `<td class="${cls}">${esc(r[c.k])}</td>`;
+    }).join("")}</tr>`;
+  }).join("");
+
+  let pager=`<div class="flat-pagination">
+    <button class="page-btn" onclick="goPage(${flatPage-1})" ${flatPage===1?"disabled":""}>← Préc.</button>
+    <span class="page-info">${((flatPage-1)*PAGE_SIZE+1).toLocaleString("fr")}–${Math.min(flatPage*PAGE_SIZE,total).toLocaleString("fr")} sur ${total.toLocaleString("fr")}</span>
+    <button class="page-btn" onclick="goPage(${flatPage+1})" ${flatPage>=pages?"disabled":""}>Suiv. →</button>
+  </div>`;
+
+  container.innerHTML=`<div class="card"><div class="table-wrap"><table class="flat"><thead><tr>${th}</tr></thead><tbody>${rows}</tbody></table></div>${pages>1?pager:""}</div>`;
+}
+
+function setSort(col){
+  if(sortCol===col) sortDir=sortDir==="asc"?"desc":"asc";
+  else{ sortCol=col; sortDir="asc"; }
+  flatPage=1;
+  render();
+}
+function goPage(p){ flatPage=p; render(); window.scrollTo(0,0); }
+
+// ── COMMANDES ────────────────────────────────────────────────
+function renderCommandes(recs,container){
+  const byOrder=groupBy(recs,"N° Commande");
+  let html='<div class="cards">';
+  const autoOpen=searchQuery.trim().length>0;
+  for(const [order,lines] of byOrder){
+    const key=`cmd:${order}`;
+    const co=lines[0];
+    const ct=contact(co);
+    const ht=sumHT(lines);
+    const isOpen=openCards.has(key)||autoOpen;
+    html+=`<div class="card">
+      <div class="card-header${isOpen?" open":""}" onclick="toggleCard(this,'${esc(key)}')" data-key="${esc(key)}">
+        <span class="chevron">▶</span>
+        ${srcBadge(co["Source"])}
+        <span class="card-title">${esc(order)}</span>
+        <span class="card-meta">${esc(co["Société / Client"])} · ${fmtDate(co["Date Commande"])}</span>
+        ${ssBadges(lines)}
+        ${ht>0?`<span class="card-ht">${fmtEUR(ht)}</span>`:""}
+        <span class="card-meta">${lines.length} ligne${lines.length>1?"s":""}</span>
+        <button class="btn-all" onclick="markAll(event,[${lines.map(l=>l["_index"]).join(",")}],'Traité')">✓ Tout traité</button>
+      </div>
+      <div class="card-body${isOpen?" open":""}">`;
+    if(ct.nom||ct.email||ct.mobile) html+=contactStrip(ct);
+    html+=ptable(lines,["Code Produit","Libellé Produit","Quantité","Total HT","Total TTC","Statut","Statut Traitement"]);
+    html+=`</div></div>`;
+  }
+  html+="</div>";
+  container.innerHTML=html;
+}
+
+// ── ENTREPRISES ──────────────────────────────────────────────
+function renderEntreprises(recs,container){
+  const byCompany=groupBy(recs,"Société / Client");
+  let html='<div class="cards">';
+  const autoOpen=searchQuery.trim().length>0;
+  for(const [company,lines] of byCompany){
+    const key=`ent:${company}`;
+    const ct=contact(lines[0]);
+    const ht=sumHT(lines);
+    const ncds=new Set(lines.map(l=>l["N° Commande"])).size;
+    const isOpen=openCards.has(key)||autoOpen;
+    html+=`<div class="card">
+      <div class="card-header${isOpen?" open":""}" onclick="toggleCard(this,'${esc(key)}')" data-key="${esc(key)}">
+        <span class="chevron">▶</span>
+        <span class="card-title">${esc(company)}</span>
+        <span class="card-meta">${ncds} commande${ncds>1?"s":""} · ${lines.length} ligne${lines.length>1?"s":""}</span>
+        ${ssBadges(lines)}
+        ${ht>0?`<span class="card-ht">${fmtEUR(ht)}</span>`:""}
+        <button class="btn-all" onclick="markAll(event,[${lines.map(l=>l["_index"]).join(",")}],'Traité')">✓ Tout traité</button>
+      </div>
+      <div class="card-body${isOpen?" open":""}">`;
+    if(ct.nom||ct.email||ct.mobile) html+=contactStrip(ct);
+    html+=`<div class="sub-orders">`;
+    const byOrder=groupBy(lines,"N° Commande");
+    for(const [order,oLines] of byOrder){
+      const oHT=sumHT(oLines);
+      html+=`<div class="sub-order-header">
+        ${srcBadge(oLines[0]["Source"])}
+        <span style="font-family:ui-monospace,monospace">${esc(order)}</span>
+        <span style="font-weight:400">${fmtDate(oLines[0]["Date Commande"])}</span>
+        ${ssBadges(oLines)}
+        ${oHT>0?`<span style="margin-left:auto;font-weight:700;color:var(--text)">${fmtEUR(oHT)}</span>`:""}
+        <button class="btn-all" onclick="markAll(event,[${oLines.map(l=>l["_index"]).join(",")}],'Traité')">✓ Tout traité</button>
+      </div>`;
+      html+=ptable(oLines,["Code Produit","Libellé Produit","Quantité","Total HT","Statut Traitement"]);
+    }
+    html+=`</div></div></div>`;
+  }
+  html+="</div>";
+  container.innerHTML=html;
+}
+
+// ── PRODUITS ─────────────────────────────────────────────────
+function renderProduits(recs,container){
+  const byProd=groupBy(recs,r=>`${r["Code Produit"]}||${r["Libellé Produit"]}`);
+  let html='<div class="cards">';
+  const autoOpen=searchQuery.trim().length>0;
+  for(const [key_,lines] of byProd){
+    const [code,label]=key_.split("||");
+    const key=`prd:${key_}`;
+    const companies=new Set(lines.map(l=>l["Société / Client"]));
+    const totalQty=lines.reduce((s,l)=>s+(parseFloat(l["Quantité"])||0),0);
+    const ht=sumHT(lines);
+    const isOpen=openCards.has(key)||autoOpen;
+    html+=`<div class="card">
+      <div class="card-header${isOpen?" open":""}" onclick="toggleCard(this,'${esc(key)}')" data-key="${esc(key)}">
+        <span class="chevron">▶</span>
+        <span class="badge n">${esc(code)}</span>
+        <span class="card-title">${esc(label)}</span>
+        <span class="card-meta">${companies.size} entreprise${companies.size>1?"s":" "}${totalQty?` · qté ${totalQty}`:""}</span>
+        ${ssBadges(lines)}
+        ${ht>0?`<span class="card-ht">${fmtEUR(ht)}</span>`:""}
+      </div>
+      <div class="card-body${isOpen?" open":""}">
+        <div class="company-rows">`;
+    const byComp=groupBy(lines,"Société / Client");
+    for(const [comp,cLines] of byComp){
+      const orders=[...new Set(cLines.map(l=>l["N° Commande"]))].join(", ");
+      const qty=cLines.reduce((s,l)=>s+(parseFloat(l["Quantité"])||0),0);
+      const cHT=sumHT(cLines);
+      html+=`<div class="company-row">
+        <span class="cr-name">${esc(comp)}</span>
+        <span class="cr-order">${esc(orders)}</span>
+        <span class="cr-qty">${qty?`qté ${qty}`:""}</span>
+        <span class="cr-ht">${cHT>0?fmtEUR(cHT):""}</span>
+        ${ssBadges(cLines)}
+      </div>`;
+    }
+    html+=`</div>`;
+    html+=ptable(lines,["Société / Client","N° Commande","Quantité","Total HT","Statut Traitement"]);
+    html+=`</div></div>`;
+  }
+  html+="</div>";
+  container.innerHTML=html;
+}
+
+// ── SHARED TABLE ─────────────────────────────────────────────
+const COL_LABELS={"Code Produit":"Code","Libellé Produit":"Libellé","Quantité":"Qté","Total HT":"Total HT","Total TTC":"Total TTC","Statut":"St. source","Statut Traitement":"Traitement","Société / Client":"Société","N° Commande":"N° Cde"};
+function ptable(lines,cols){
+  let h=`<table class="ptable"><thead><tr>${cols.map(c=>`<th${c==="Total HT"||c==="Total TTC"||c==="Quantité"?' class="r"':''}>${COL_LABELS[c]||esc(c)}</th>`).join("")}</tr></thead><tbody>`;
+  for(const l of lines){
+    h+=`<tr>${cols.map(c=>{
+      if(c==="Statut Traitement") return `<td>${sselect(l[c],l["_index"])}</td>`;
+      if(c==="Source") return `<td>${srcBadge(l[c])}</td>`;
+      if(c==="Statut") return `<td>${statutBadge(l[c])}</td>`;
+      if(c==="Total HT"||c==="Total TTC") return `<td class="r ht-cell">${fmtEUR(l[c])}</td>`;
+      if(c==="N° Commande") return `<td class="code-cell">${esc(l[c])}</td>`;
+      if(c==="Code Produit") return `<td class="code-cell">${esc(l[c])}</td>`;
+      if(c==="Quantité") return `<td class="r">${esc(l[c])}</td>`;
+      if(c==="Libellé Produit") return `<td class="label-cell">${esc(l[c])}</td>`;
+      return `<td>${esc(l[c])}</td>`;
+    }).join("")}</tr>`;
+  }
+  h+=`</tbody></table>`;
+  return h;
+}
+function contactStrip(ct){
+  return `<div class="contact-strip">
+    ${ct.nom?`<span>👤 <b>${esc(ct.nom)}</b></span>`:""}
+    ${ct.email?`<span>✉ ${esc(ct.email)}</span>`:""}
+    ${ct.mobile?`<span>📱 ${esc(ct.mobile)}</span>`:""}
+  </div>`;
+}
+
+// ── CARD TOGGLE ──────────────────────────────────────────────
+function toggleCard(header,key){
+  header.classList.toggle("open");
+  header.nextElementSibling.classList.toggle("open");
+  if(openCards.has(key)) openCards.delete(key); else openCards.add(key);
+}
+function restoreOpen(){
+  document.querySelectorAll(".card-header[data-key]").forEach(h=>{
+    const key=h.dataset.key;
+    if(openCards.has(key)){
+      h.classList.add("open");
+      h.nextElementSibling.classList.add("open");
+    }
+  });
+}
+
+// ── STATUS CHANGE ────────────────────────────────────────────
+let saveTimer=null;
+function onStatut(sel){
+  const idx=parseInt(sel.dataset.idx);
+  const statut=sel.value;
+  sel.className=`sselect ${scl(statut)}`;
+  document.querySelectorAll(`select[data-idx="${idx}"]`).forEach(s=>{
+    if(s!==sel){ s.value=statut; s.className=`sselect ${scl(statut)}`; }
+  });
+  const rec=allRecords.find(r=>r["_index"]===idx);
+  if(rec) rec["Statut Traitement"]=statut;
+  updateStats();
+  updateCountBar(filtered());
+  showToast("💾 Sauvegardé");
+  clearTimeout(saveTimer);
+  saveTimer=setTimeout(()=>saveOne(idx,statut),350);
+}
+
+async function saveOne(idx,statut){
+  await fetch("/api/update",{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({fichier:currentFile,index:idx,statut})});
+}
+
+async function markAll(evt,indices,statut){
+  evt.stopPropagation();
+  const btn=evt.target;
+  btn.disabled=true; btn.textContent="…";
+  for(const idx of indices){
+    const rec=allRecords.find(r=>r["_index"]===idx);
+    if(rec) rec["Statut Traitement"]=statut;
+  }
+  document.querySelectorAll("select[data-idx]").forEach(s=>{
+    if(indices.includes(parseInt(s.dataset.idx))){ s.value=statut; s.className=`sselect ${scl(statut)}`; }
+  });
+  updateStats();
+  updateCountBar(filtered());
+  await fetch("/api/update_batch",{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({fichier:currentFile,updates:indices.map(i=>({index:i,statut}))})});
+  btn.disabled=false; btn.textContent="✓ Tout traité";
+  showToast(`✅ ${indices.length} ligne${indices.length>1?"s":""} marquée${indices.length>1?"s":""} Traité`);
+}
+
+// ── TOAST ────────────────────────────────────────────────────
+let toastTimer=null;
+function showToast(msg){
+  const t=document.getElementById("toast");
+  t.textContent=msg; t.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>t.classList.remove("show"),2000);
+}
+
+// ── IMPORT ───────────────────────────────────────────────────
+function resetDrawer(){
+  // Réinitialise les fichiers sélectionnés
+  ["Klipso","Expose"].forEach(src=>{
+    const inp=document.getElementById(`file${src}`);
+    inp.value="";
+    document.getElementById(`name${src}`).textContent="";
+  });
+  // Réinitialise le message résultat
+  const res=document.getElementById("importResult");
+  res.className=""; res.textContent="";
+  // Désactive le bouton run
+  document.getElementById("btnRun").disabled=true;
+  document.getElementById("btnRun").textContent="Normaliser et\nimporter";
+  // Ferme l'historique
+  document.getElementById("historyPanel").classList.remove("open");
+  document.getElementById("importDrawer").classList.remove("history-open");
+  document.getElementById("btnHistory").classList.remove("active");
+}
+
+document.getElementById("btnImport").addEventListener("click",()=>{
+  const d=document.getElementById("importDrawer");
+  const btn=document.getElementById("btnImport");
+  const wasOpen=d.classList.contains("open");
+  d.classList.toggle("open");
+  btn.classList.toggle("open");
+  btn.textContent=d.classList.contains("open")?"✕ Fermer":"↑ Importer CSV";
+  // Reset à la fermeture
+  if(wasOpen) resetDrawer();
+});
+
+["Klipso","Expose"].forEach(src=>{
+  const inp=document.getElementById(`file${src}`);
+  const nm=document.getElementById(`name${src}`);
+  inp.addEventListener("change",()=>{
+    const f=inp.files[0];
+    nm.textContent=f?`✓ ${f.name}`:"";
+    updateRunBtn();
+  });
+  const dz=document.getElementById(`dz${src}`);
+  dz.addEventListener("dragover",e=>{e.preventDefault();dz.classList.add("over")});
+  dz.addEventListener("dragleave",()=>dz.classList.remove("over"));
+  dz.addEventListener("drop",e=>{
+    e.preventDefault(); dz.classList.remove("over");
+    const f=e.dataTransfer.files[0];
+    if(f){ inp.files=e.dataTransfer.files; nm.textContent=`✓ ${f.name}`; updateRunBtn(); }
+  });
+});
+
+function updateRunBtn(){
+  const k=document.getElementById("fileKlipso").files.length>0;
+  const ex=document.getElementById("fileExpose").files.length>0;
+  document.getElementById("btnRun").disabled=!(k||ex);
+}
+
+document.getElementById("btnRun").addEventListener("click",async()=>{
+  const btn=document.getElementById("btnRun");
+  const res=document.getElementById("importResult");
+  btn.disabled=true; btn.textContent="Import…";
+  res.className=""; res.textContent="Normalisation en cours…";
+
+  const fd=new FormData();
+  const k=document.getElementById("fileKlipso").files[0];
+  const ex=document.getElementById("fileExpose").files[0];
+  if(k) fd.append("klipso",k);
+  if(ex) fd.append("expose",ex);
+
+  try{
+    const r=await fetch("/api/import",{method:"POST",body:fd});
+    const d=await r.json();
+    if(d.ok){
+      res.className="ok";
+      res.textContent=`✅ ${d.nouvelles_commandes} nouvelles commandes · ${d.nouvelles_lignes} lignes ajoutées${d.commandes_ignorees?` · ${d.commandes_ignorees} ignorées (déjà présentes)`:""}`;
+      // Auto-dismiss après 6 secondes
+      setTimeout(()=>{ res.classList.add("fade"); setTimeout(()=>{ res.className=""; res.textContent=""; },400); },6000);
+      // Switch to master file
+      const sel=document.getElementById("fileSelect");
+      let found=false;
+      for(let o of sel.options){ if(o.value==="suivi_master.csv"){sel.value="suivi_master.csv";found=true;break;} }
+      if(!found){
+        const opt=new Option("suivi_master.csv","suivi_master.csv",true,true);
+        sel.insertBefore(opt,sel.firstChild);
+        sel.value="suivi_master.csv";
+      }
+      await loadData("suivi_master.csv");
+      // Rafraîchir l'historique s'il est ouvert
+      if(document.getElementById("historyPanel").classList.contains("open")) loadHistory();
+    } else {
+      res.className="err";
+      res.textContent=`❌ ${d.error||"Erreur"} ${(d.details||[]).join(" | ")}`;
+    }
+  } catch(e){
+    res.className="err"; res.textContent=`❌ Erreur réseau : ${e}`;
+  }
+  btn.disabled=false; btn.textContent="Normaliser et\nimporter";
+});
+
+// ── HISTORIQUE ───────────────────────────────────────────────
+async function loadHistory(){
+  const content=document.getElementById("historyContent");
+  content.innerHTML='<span class="hist-empty">Chargement…</span>';
+  const r=await fetch("/api/import_history");
+  const hist=await r.json();
+  if(!hist.length){ content.innerHTML='<span class="hist-empty">Aucun import enregistré pour le moment.</span>'; return; }
+  let html=`<table class="hist-table"><thead><tr>
+    <th>Date</th><th>Sources</th><th>Nv. commandes</th><th>Nv. lignes</th><th>Ignorées</th><th>Total master</th>
+  </tr></thead><tbody>`;
+  for(const h of hist){
+    const srcs=(h.sources||[]).map(s=>`<span class="badge ${s==="Klipso"?"k":"e"}">${s}</span>`).join("");
+    html+=`<tr>
+      <td class="date">${h.date}</td>
+      <td><div class="hist-src">${srcs}</div></td>
+      <td class="new">+${h.nouvelles_commandes}</td>
+      <td class="new">+${h.nouvelles_lignes}</td>
+      <td class="${h.commandes_ignorees>0?"skip":""}"">${h.commandes_ignorees||0}</td>
+      <td>${h.total_lignes?.toLocaleString("fr")||"—"} lignes</td>
+    </tr>`;
+  }
+  html+=`</tbody></table>`;
+  content.innerHTML=html;
+}
+
+document.getElementById("btnHistory").addEventListener("click",function(){
+  const panel=document.getElementById("historyPanel");
+  const drawer=document.getElementById("importDrawer");
+  const isOpen=panel.classList.toggle("open");
+  drawer.classList.toggle("history-open",isOpen);
+  this.classList.toggle("active",isOpen);
+  if(isOpen) loadHistory();
+});
+
+// ── SEARCH & TABS & FILTERS ──────────────────────────────────
+const si=document.getElementById("searchInput");
+const cb=document.getElementById("clearSearch");
+si.addEventListener("input",()=>{
+  searchQuery=si.value;
+  cb.classList.toggle("show",searchQuery.length>0);
+  flatPage=1; render();
+});
+cb.addEventListener("click",()=>{
+  si.value=""; searchQuery=""; cb.classList.remove("show"); flatPage=1; render(); si.focus();
+});
+document.addEventListener("keydown",e=>{ if(e.key==="Escape"&&searchQuery){ si.value=""; searchQuery=""; cb.classList.remove("show"); flatPage=1; render(); } });
+
+document.querySelectorAll(".tab").forEach(btn=>{
+  btn.addEventListener("click",function(){
+    document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active"));
+    this.classList.add("active");
+    currentTab=this.dataset.tab;
+    flatPage=1; render();
+  });
+});
+
+document.querySelectorAll(".sf").forEach(btn=>{
+  btn.addEventListener("click",function(){
+    document.querySelectorAll(".sf").forEach(b=>b.classList.remove("active"));
+    this.classList.add("active");
+    filterStatut=this.dataset.s;
+    flatPage=1; render();
+  });
+});
+
+document.getElementById("fileSelect").addEventListener("change",function(){ loadData(this.value); });
+
+// ── INIT ─────────────────────────────────────────────────────
+const initFile=document.getElementById("fileSelect").value;
+if(initFile) loadData(initFile);
+else document.getElementById("results").innerHTML='<div class="empty">Aucun fichier CSV trouvé — importez vos premiers CSV ci-dessus</div>';
+</script>
+</body>
+</html>
