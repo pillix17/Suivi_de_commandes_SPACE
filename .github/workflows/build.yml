@@ -39,6 +39,8 @@ jobs:
 
       - name: Générer l'icône
         run: python make_icon.py
+        env:
+          PYTHONUTF8: "1"
 
       - name: PyInstaller → SuiviCommandes.exe
         run: pyinstaller build_windows.spec --clean --noconfirm
