@@ -76,6 +76,11 @@ a{color:inherit;text-decoration:none}
 .hist-src{display:flex;gap:3px}
 .hist-empty{color:#475569;font-size:12px;padding:8px 0}
 
+/* ── BOUTON EXPORT ── */
+.btn-export{padding:5px 11px;border-radius:6px;border:1px solid var(--green-border);background:var(--green-bg);cursor:pointer;font-size:11px;font-weight:600;color:var(--green);transition:all .15s;white-space:nowrap}
+.btn-export:hover{background:#dcfce7;border-color:#86efac}
+.btn-export:active{background:#bbf7d0}
+
 /* ── BOUTON FILTRE PRODUITS (toolbar) ── */
 .btn-prod-filter{padding:5px 11px;border-radius:6px;border:1px solid var(--border);background:white;cursor:pointer;font-size:11px;font-weight:600;color:var(--muted);transition:all .15s;white-space:nowrap;display:flex;align-items:center;gap:5px}
 .btn-prod-filter:hover{color:var(--text)}
@@ -327,6 +332,7 @@ table.flat td.num{text-align:right;font-variant-numeric:tabular-nums}
   <button class="btn-prod-filter" id="btnProdFilter" onclick="openProductModal()">
     🎛 <span id="pfLabel">Tous les produits</span>
   </button>
+  <button class="btn-export" id="btnExport" onclick="exportCSV()" title="Exporter la sélection en CSV">⬇ Export CSV</button>
 </div>
 
 <!-- MODAL FILTRES PRODUITS -->
@@ -1205,6 +1211,24 @@ async function deletePreset(){
   if(activePresetName===name){ activePresetName=null; filterProducts=null; updatePFButton(); render(); }
   populatePresetSelect();
   showToast(`🗑 Preset "${name}" supprimé`);
+}
+
+// ── EXPORT CSV ───────────────────────────────────────────────
+function exportCSV(){
+  const params = new URLSearchParams();
+  params.set("fichier", currentFile || "suivi_master.csv");
+  if(filterStatut !== "all") params.set("statut", filterStatut);
+  if(filterProducts !== null){
+    for(const code of filterProducts) params.append("codes", code);
+  }
+  const url = `/api/export?${params.toString()}`;
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  showToast("⬇ Export en cours…");
 }
 
 // ── INIT ─────────────────────────────────────────────────────

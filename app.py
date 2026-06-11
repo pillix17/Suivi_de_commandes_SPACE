@@ -438,6 +438,40 @@ def api_delete_preset(name):
         sauver_presets(p)
     return jsonify({"ok": True})
 
+@app.route("/api/export")
+def api_export():
+    import io
+    fichier = request.args.get("fichier", MASTER_FILE)
+    statut  = request.args.get("statut", "")        # "" = tous
+    codes   = request.args.getlist("codes")          # liste vide = tous
+
+    path = os.path.join(DOSSIER, os.path.basename(fichier))
+    if not os.path.exists(path):
+        return jsonify({"error": "Fichier introuvable"}), 404
+
+    df = lire_csv(path)
+
+    if statut:
+        df = df[df[STATUT_COL] == statut]
+    if codes:
+        df = df[df["Code Produit"].str.strip().isin(codes)]
+
+    # Colonnes à exporter (sans colonnes internes)
+    cols_export = [c for c in df.columns if c != "Semaine Import"]
+
+    buf = io.StringIO()
+    df[cols_export].to_csv(buf, sep=";", index=False, encoding="utf-8-sig")
+    buf.seek(0)
+
+    from flask import Response
+    filename = f"export_suivi_{datetime.now().strftime('%Y%m%d_%H%M')}.csv"
+    return Response(
+        "﻿" + buf.getvalue(),
+        mimetype="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+
+
 @app.route("/api/presets/reset-space", methods=["POST"])
 def api_reset_space_preset():
     codes = construire_preset_space()
