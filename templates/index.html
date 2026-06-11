@@ -350,7 +350,7 @@ table.flat td.num{text-align:right;font-variant-numeric:tabular-nums}
       <input class="preset-name-input" id="presetNameInput" placeholder="Nom du preset…">
       <button class="btn-preset-save" onclick="savePreset()">💾 Sauvegarder</button>
       <button class="btn-preset-del"  onclick="deletePreset()">🗑</button>
-      <button class="btn-preset-reset" id="btnResetSpace" onclick="resetSpacePreset()" style="display:none">↺ Réinitialiser</button>
+      <button class="btn-preset-reset" id="btnResetSpace" onclick="resetSpacePreset()">↺ produits-SPACE</button>
     </div>
     <div class="prod-search-bar">
       <input type="text" id="prodSearch" placeholder="Rechercher code ou libellé…" oninput="renderProductList()">
@@ -1174,13 +1174,12 @@ function updatePFButton(){
 
 // ── Presets ──────────────────────────────────────────────────
 function loadPreset(name){
-  if(!name){ document.getElementById("btnResetSpace").style.display="none"; return; }
+  if(!name) return;
   const codes = savedPresets[name];
   if(!codes) return;
   checkedCodes = new Set(codes);
   document.getElementById("presetNameInput").value = name;
   activePresetName = name;
-  document.getElementById("btnResetSpace").style.display = name==="produits-SPACE" ? "" : "none";
   renderProductList();
 }
 
@@ -1205,6 +1204,7 @@ async function resetSpacePreset(){
 async function savePreset(){
   const name=(document.getElementById("presetNameInput").value||"").trim();
   if(!name){ showToast("❌ Donnez un nom au preset"); return; }
+  if(name==="produits-SPACE"){ showToast("❌ Ce preset est protégé — utilisez ↺ pour le réinitialiser"); return; }
   const codes=[...checkedCodes];
   const r=await fetch("/api/presets",{method:"POST",headers:{"Content-Type":"application/json"},
     body:JSON.stringify({name,codes})});
@@ -1221,6 +1221,7 @@ async function savePreset(){
 async function deletePreset(){
   const name=document.getElementById("presetSelect").value;
   if(!name){ showToast("Sélectionnez un preset à supprimer"); return; }
+  if(name==="produits-SPACE"){ showToast("❌ Ce preset est protégé et ne peut pas être supprimé"); return; }
   if(!confirm(`Supprimer le preset "${name}" ?`)) return;
   await fetch(`/api/presets/${encodeURIComponent(name)}`,{method:"DELETE"});
   delete savedPresets[name];

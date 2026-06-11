@@ -34,6 +34,17 @@ def _get_data_dir():
 DOSSIER = _get_data_dir()
 os.makedirs(DOSSIER, exist_ok=True)
 
+# ── Mise à jour automatique de la référence produits ─────────
+# À chaque lancement de l'app compilée, on écrase produits_reference.csv
+# avec la version embarquée dans l'EXE (les données utilisateur ne sont
+# jamais dans l'EXE, donc suivi_master et presets ne sont pas touchés).
+if getattr(sys, "frozen", False):
+    import shutil
+    _ref_src = os.path.join(BASE_DIR, "produits_reference.csv")
+    _ref_dst = os.path.join(DOSSIER, "produits_reference.csv")
+    if os.path.exists(_ref_src):
+        shutil.copy2(_ref_src, _ref_dst)
+
 # ── Logging vers fichier quand compilé ───────────────────────
 if getattr(sys, "frozen", False):
     logging.basicConfig(
