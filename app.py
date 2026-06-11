@@ -438,6 +438,16 @@ def api_delete_preset(name):
         sauver_presets(p)
     return jsonify({"ok": True})
 
+@app.route("/api/presets/reset-space", methods=["POST"])
+def api_reset_space_preset():
+    codes = construire_preset_space()
+    if not codes:
+        return jsonify({"ok": False, "error": "Fichier référence introuvable"}), 500
+    p = lire_presets()
+    p["produits-SPACE"] = codes
+    sauver_presets(p)
+    return jsonify({"ok": True, "codes": codes, "count": len(codes)})
+
 
 def find_free_port(start=5050):
     import socket

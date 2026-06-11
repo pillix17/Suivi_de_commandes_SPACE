@@ -101,6 +101,8 @@ a{color:inherit;text-decoration:none}
 .btn-preset-save:hover{background:#6d28d9}
 .btn-preset-del{padding:4px 8px;background:white;color:var(--red);border:1px solid var(--red-border);border-radius:5px;font-size:11px;cursor:pointer}
 .btn-preset-del:hover{background:var(--red-bg)}
+.btn-preset-reset{padding:4px 10px;background:white;color:#0369a1;border:1px solid #bae6fd;border-radius:5px;font-size:11px;font-weight:600;cursor:pointer}
+.btn-preset-reset:hover{background:#f0f9ff}
 
 /* Barre recherche produits */
 .prod-search-bar{padding:10px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;flex-shrink:0}
@@ -342,6 +344,7 @@ table.flat td.num{text-align:right;font-variant-numeric:tabular-nums}
       <input class="preset-name-input" id="presetNameInput" placeholder="Nom du preset…">
       <button class="btn-preset-save" onclick="savePreset()">💾 Sauvegarder</button>
       <button class="btn-preset-del"  onclick="deletePreset()">🗑</button>
+      <button class="btn-preset-reset" id="btnResetSpace" onclick="resetSpacePreset()" style="display:none">↺ Réinitialiser</button>
     </div>
     <div class="prod-search-bar">
       <input type="text" id="prodSearch" placeholder="Rechercher code ou libellé…" oninput="renderProductList()">
@@ -1149,13 +1152,32 @@ function updatePFButton(){
 
 // ── Presets ──────────────────────────────────────────────────
 function loadPreset(name){
-  if(!name) return;
+  if(!name){ document.getElementById("btnResetSpace").style.display="none"; return; }
   const codes = savedPresets[name];
   if(!codes) return;
   checkedCodes = new Set(codes);
   document.getElementById("presetNameInput").value = name;
   activePresetName = name;
+  document.getElementById("btnResetSpace").style.display = name==="produits-SPACE" ? "" : "none";
   renderProductList();
+}
+
+async function resetSpacePreset(){
+  if(!confirm("Réinitialiser le preset « produits-SPACE » avec les 70 produits Communication par défaut ?")) return;
+  const r = await fetch("/api/presets/reset-space", {method:"POST"});
+  const d = await r.json();
+  if(d.ok){
+    savedPresets["produits-SPACE"] = d.codes;
+    checkedCodes = new Set(d.codes);
+    populatePresetSelect();
+    document.getElementById("presetSelect").value = "produits-SPACE";
+    document.getElementById("presetNameInput").value = "produits-SPACE";
+    activePresetName = "produits-SPACE";
+    renderProductList();
+    showToast(`✅ Preset réinitialisé — ${d.count} produits`);
+  } else {
+    showToast("❌ " + (d.error || "Erreur"));
+  }
 }
 
 async function savePreset(){
