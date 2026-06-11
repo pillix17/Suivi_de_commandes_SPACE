@@ -388,6 +388,7 @@ def api_products():
         code_col  = next((c for c in df.columns if c.lower() == "code"),                None)
         label_col = next((c for c in df.columns if "lib" in c.lower()),                 None)
         fam_col   = next((c for c in df.columns if "famille" in c.lower()),             None)
+        alt_col = next((c for c in df.columns if "alternatif" in c.lower()), None)
         if code_col:
             result = []
             for _, row in df.iterrows():
@@ -395,7 +396,9 @@ def api_products():
                 label = str(row[label_col]).strip().strip('"') if label_col else ""
                 fam   = str(row[fam_col]).strip().strip('"')   if fam_col  else ""
                 if code and code.lower() not in ("nan", "") and fam.lower() != "nan":
-                    result.append({"code": code, "label": label, "famille": fam or "Autres"})
+                    alts_raw = str(row[alt_col]).strip().strip('"') if alt_col else ""
+                    alts = [a for a in alts_raw.split("|") if a] if alts_raw and alts_raw.lower() != "nan" else []
+                    result.append({"code": code, "label": label, "famille": fam or "Autres", "alternatives": alts})
             return jsonify(result)
 
     # Fallback : extraire du master

@@ -448,7 +448,14 @@ function filtered(){
     (x["Contact Prénom"]||"").toLowerCase().includes(q)
   );
   if(filterStatut!=="all") r=r.filter(x=>x["Statut Traitement"]===filterStatut);
-  if(filterProducts!==null) r=r.filter(x=>filterProducts.has((x["Code Produit"]||"").trim()));
+  if(filterProducts!==null) r=r.filter(x=>{
+    const c=(x["Code Produit"]||"").trim();
+    if(filterProducts.has(c)) return true;
+    // vérifier si un code équivalent est dans le filtre
+    const group=codeAliasMap.get(c);
+    if(group) for(const eq of group) if(filterProducts.has(eq)) return true;
+    return false;
+  });
   return r;
 }
 
@@ -950,9 +957,10 @@ document.querySelectorAll(".sf").forEach(btn=>{
 document.getElementById("fileSelect").addEventListener("change",function(){ loadData(this.value); });
 
 // ── FILTRE PRODUITS ──────────────────────────────────────────
-let allProducts   = [];   // [{code, label, famille}]
+let allProducts   = [];   // [{code, label, famille, alternatives:[]}]
+let codeAliasMap  = new Map(); // code → Set de tous les codes équivalents (lui-même inclus)
 let checkedCodes  = new Set();  // codes cochés dans le modal (état provisoire)
-let filterProducts = null;      // null = pas de filtre | Set = filtre actif
+let filterProducts = null;      // null = pas de filtre | Set = filtre actif (codes principaux)
 let activePresetName = null;
 let savedPresets  = {};
 let openGroups    = new Set();  // familles dépliées dans le modal
@@ -963,6 +971,14 @@ async function initProductFilter(){
   ]);
   allProducts  = await prodRes.json();
   savedPresets = await presRes.json();
+
+  // Construire le map code → groupe complet d'équivalents
+  codeAliasMap.clear();
+  for(const p of allProducts){
+    const group = new Set([p.code, ...(p.alternatives||[])]);
+    for(const c of group) codeAliasMap.set(c, group);
+  }
+
   populatePresetSelect();
 
   // Restaurer filtre depuis localStorage
@@ -1219,7 +1235,14 @@ function exportCSV(){
   params.set("fichier", currentFile || "suivi_master.csv");
   if(filterStatut !== "all") params.set("statut", filterStatut);
   if(filterProducts !== null){
-    for(const code of filterProducts) params.append("codes", code);
+    // Envoyer tous les codes équivalents (principal + alternatifs)
+    const allCodes = new Set();
+    for(const code of filterProducts){
+      allCodes.add(code);
+      const group = codeAliasMap.get(code);
+      if(group) for(const eq of group) allCodes.add(eq);
+    }
+    for(const code of allCodes) params.append("codes", code);
   }
   const url = `/api/export?${params.toString()}`;
   const a = document.createElement("a");
