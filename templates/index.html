@@ -80,6 +80,12 @@ a{color:inherit;text-decoration:none}
 .btn-export{padding:5px 11px;border-radius:6px;border:1px solid var(--green-border);background:var(--green-bg);cursor:pointer;font-size:11px;font-weight:600;color:var(--green);transition:all .15s;white-space:nowrap}
 .btn-export:hover{background:#dcfce7;border-color:#86efac}
 .btn-export:active{background:#bbf7d0}
+.date-range-wrap{display:flex;align-items:center;gap:5px;flex-shrink:0}
+.date-range-label{font-size:11px;color:var(--muted);white-space:nowrap}
+.date-range-wrap input[type=date]{padding:4px 7px;border:1px solid var(--border);border-radius:6px;font-size:11px;color:var(--text);background:white;cursor:pointer;width:118px}
+.date-range-wrap input[type=date].active{border-color:#7c3aed;background:#f5f3ff}
+.date-clear-btn{padding:2px 6px;border:1px solid var(--border);border-radius:5px;background:white;cursor:pointer;font-size:10px;color:var(--muted)}
+.date-clear-btn:hover{background:var(--red-bg);color:var(--red);border-color:var(--red-border)}
 
 /* ── BOUTON FILTRE PRODUITS (toolbar) ── */
 .btn-prod-filter{padding:5px 11px;border-radius:6px;border:1px solid var(--border);background:white;cursor:pointer;font-size:11px;font-weight:600;color:var(--muted);transition:all .15s;white-space:nowrap;display:flex;align-items:center;gap:5px}
@@ -332,6 +338,13 @@ table.flat td.num{text-align:right;font-variant-numeric:tabular-nums}
   <button class="btn-prod-filter" id="btnProdFilter" onclick="openProductModal()">
     🎛 <span id="pfLabel">Tous les produits</span>
   </button>
+  <div class="date-range-wrap">
+    <label class="date-range-label">Du</label>
+    <input type="date" id="dateFrom" onchange="onDateChange()">
+    <label class="date-range-label">au</label>
+    <input type="date" id="dateTo" onchange="onDateChange()">
+    <button class="date-clear-btn" id="dateClearBtn" onclick="clearDateFilter()" style="display:none" title="Effacer les dates">✕</button>
+  </div>
   <button class="btn-export" id="btnExport" onclick="exportCSV()" title="Exporter la sélection en CSV">⬇ Export CSV</button>
 </div>
 
@@ -379,6 +392,8 @@ let currentFile = "";
 let currentTab = "commande";
 let searchQuery = "";
 let filterStatut = "all";
+let filterDateFrom = "";
+let filterDateTo = "";
 let openCards = new Set();
 let sortCol = "Date Commande";
 let sortDir = "desc";
@@ -448,6 +463,17 @@ function filtered(){
     (x["Contact Prénom"]||"").toLowerCase().includes(q)
   );
   if(filterStatut!=="all") r=r.filter(x=>x["Statut Traitement"]===filterStatut);
+  if(filterDateFrom||filterDateTo){
+    r=r.filter(x=>{
+      const raw=(x["Date Commande"]||"").trim().split(" ")[0]; // DD/MM/YYYY
+      if(!raw) return false;
+      const [d,m,y]=raw.split("/");
+      const iso=`${y}-${m}-${d}`;
+      if(filterDateFrom && iso<filterDateFrom) return false;
+      if(filterDateTo   && iso>filterDateTo)   return false;
+      return true;
+    });
+  }
   if(filterProducts!==null) r=r.filter(x=>{
     const c=(x["Code Produit"]||"").trim();
     if(filterProducts.has(c)) return true;
@@ -1231,10 +1257,31 @@ async function deletePreset(){
 }
 
 // ── EXPORT CSV ───────────────────────────────────────────────
+function onDateChange(){
+  filterDateFrom = document.getElementById("dateFrom").value;
+  filterDateTo   = document.getElementById("dateTo").value;
+  const active = filterDateFrom || filterDateTo;
+  document.getElementById("dateClearBtn").style.display = active ? "" : "none";
+  document.getElementById("dateFrom").classList.toggle("active", !!filterDateFrom);
+  document.getElementById("dateTo").classList.toggle("active", !!filterDateTo);
+  flatPage=1; render();
+}
+function clearDateFilter(){
+  filterDateFrom=""; filterDateTo="";
+  document.getElementById("dateFrom").value="";
+  document.getElementById("dateTo").value="";
+  document.getElementById("dateClearBtn").style.display="none";
+  document.getElementById("dateFrom").classList.remove("active");
+  document.getElementById("dateTo").classList.remove("active");
+  flatPage=1; render();
+}
+
 function exportCSV(){
   const params = new URLSearchParams();
   params.set("fichier", currentFile || "suivi_master.csv");
   if(filterStatut !== "all") params.set("statut", filterStatut);
+  if(filterDateFrom) params.set("date_from", filterDateFrom);
+  if(filterDateTo)   params.set("date_to",   filterDateTo);
   if(filterProducts !== null){
     // Envoyer tous les codes équivalents (principal + alternatifs)
     const allCodes = new Set();

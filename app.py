@@ -455,9 +455,11 @@ def api_delete_preset(name):
 @app.route("/api/export")
 def api_export():
     import io
-    fichier = request.args.get("fichier", MASTER_FILE)
-    statut  = request.args.get("statut", "")        # "" = tous
-    codes   = request.args.getlist("codes")          # liste vide = tous
+    fichier    = request.args.get("fichier", MASTER_FILE)
+    statut     = request.args.get("statut", "")
+    codes      = request.args.getlist("codes")
+    date_from  = request.args.get("date_from", "")   # YYYY-MM-DD
+    date_to    = request.args.get("date_to",   "")
 
     path = os.path.join(DOSSIER, os.path.basename(fichier))
     if not os.path.exists(path):
@@ -469,6 +471,26 @@ def api_export():
         df = df[df[STATUT_COL] == statut]
     if codes:
         df = df[df["Code Produit"].str.strip().isin(codes)]
+    if date_from or date_to:
+        def to_iso(v):
+            v = str(v).strip().split(" ")[0]
+            for fmt in ("%d/%m/%Y", "%Y-%m-%d"):
+                try:
+                    from datetime import datetime as dt
+                    return dt.strptime(v, fmt).strftime("%Y-%m-%d")
+                except ValueError:
+                    pass
+            return None
+        def in_range(v):
+            iso = to_iso(v)
+            if not iso:
+                return False
+            if date_from and iso < date_from:
+                return False
+            if date_to and iso > date_to:
+                return False
+            return True
+        df = df[df["Date Commande"].apply(in_range)]
 
     # Colonnes à exporter (sans colonnes internes)
     cols_export = [c for c in df.columns if c != "Semaine Import"]
