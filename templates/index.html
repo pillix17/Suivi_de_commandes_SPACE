@@ -348,8 +348,7 @@ table.flat td.num{text-align:right;font-variant-numeric:tabular-nums}
       <label class="dd-item"><input type="checkbox" name="sf" value="En cours" onchange="onStatutCheck()"> En cours</label>
       <label class="dd-item"><input type="checkbox" name="sf" value="Traité" onchange="onStatutCheck()"> Traité</label>
       <div class="dd-section-label" style="margin-top:8px">Commande</div>
-      <label class="dd-item"><input type="checkbox" name="sf2" value="Confirmée" onchange="onStatutCheck()"> Confirmée</label>
-      <label class="dd-item"><input type="checkbox" name="sf2" value="Facturée" onchange="onStatutCheck()"> Facturée</label>
+      <div id="sf2Container"></div>
     </div>
   </div>
   <button class="btn-prod-filter" id="btnProdFilter" onclick="openProductModal()">
@@ -481,8 +480,6 @@ function filtered(){
     (x["Contact Nom"]||"").toLowerCase().includes(q)||
     (x["Contact Prénom"]||"").toLowerCase().includes(q)
   );
-  // Masquer les commandes non confirmées / non facturées
-  r=r.filter(x=>{ const v=(x["Statut"]||"").toLowerCase(); return v.includes("confirm")||v.includes("factur"); });
   if(filterSourceStatut.size) r=r.filter(x=>filterSourceStatut.has(x["Statut"]));
   if(filterStatut.size) r=r.filter(x=>filterStatut.has(x["Statut Traitement"]));
   if(filterDateFrom||filterDateTo){
@@ -551,6 +548,18 @@ function updateCountBar(recs){
 }
 
 // ── LOAD ─────────────────────────────────────────────────────
+const DEFAULT_SRC_STATUTS = new Set(["Confirmée", "Facturée"]);
+
+function buildSf2Checkboxes(){
+  const statuts=[...new Set(allRecords.map(x=>x["Statut"]||"").filter(Boolean))].sort();
+  const container=document.getElementById("sf2Container");
+  if(!container) return;
+  container.innerHTML=statuts.map(s=>{
+    const checked=filterSourceStatut.has(s)?"checked":"";
+    return `<label class="dd-item"><input type="checkbox" name="sf2" value="${esc(s)}" ${checked} onchange="onStatutCheck()"> ${esc(s)}</label>`;
+  }).join("");
+}
+
 async function loadData(file){
   document.getElementById("results").innerHTML='<div class="loading"><span class="spinner"></span>Chargement…</div>';
   const r=await fetch(`/api/data?fichier=${encodeURIComponent(file)}`);
@@ -558,6 +567,12 @@ async function loadData(file){
   allRecords=data.records;
   currentFile=data.fichier;
   flatPage=1;
+  // Pré-cocher Confirmée + Facturée si c'est le premier chargement
+  if(filterSourceStatut.size===0){
+    filterSourceStatut=new Set([...DEFAULT_SRC_STATUTS].filter(s=>allRecords.some(x=>x["Statut"]===s)));
+  }
+  buildSf2Checkboxes();
+  onStatutCheck();
   updateStats();
   render();
 }
