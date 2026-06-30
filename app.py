@@ -334,16 +334,33 @@ def api_import():
     master_path = os.path.join(DOSSIER, MASTER_FILE)
     if os.path.exists(master_path):
         master_df = lire_csv(master_path)
-        existing = set(master_df["N° Commande"].str.strip())
-        new_rows = new_df[~new_df["N° Commande"].str.strip().isin(existing)].copy()
+        # Index du master par (N° Commande + Code Produit) pour mise à jour précise
+        master_df["_key"] = master_df["N° Commande"].str.strip() + "|" + master_df["Code Produit"].str.strip()
+        new_df["_key"]    = new_df["N° Commande"].str.strip()    + "|" + new_df["Code Produit"].str.strip()
+        existing_keys = set(master_df["_key"])
+        existing_nums = set(master_df["N° Commande"].str.strip())
+
+        # Mettre à jour le Statut des lignes existantes
+        statut_map = new_df.set_index("_key")["Statut"].to_dict()
+        updated_statuts = 0
+        for idx, row in master_df.iterrows():
+            key = row["_key"]
+            if key in statut_map and master_df.at[idx, "Statut"] != statut_map[key]:
+                master_df.at[idx, "Statut"] = statut_map[key]
+                updated_statuts += 1
+        master_df.drop(columns=["_key"], inplace=True)
+
+        new_rows = new_df[~new_df["_key"].isin(existing_keys)].copy()
+        new_rows.drop(columns=["_key"], inplace=True)
         new_orders = int(new_rows["N° Commande"].nunique())
-        skipped = int(new_df[new_df["N° Commande"].str.strip().isin(existing)]["N° Commande"].nunique())
+        skipped = int(new_df[new_df["N° Commande"].str.strip().isin(existing_nums)]["N° Commande"].nunique())
         merged = pd.concat([master_df, new_rows], ignore_index=True)
     else:
-        new_rows = new_df
+        new_rows = new_df.drop(columns=["_key"], errors="ignore")
         new_orders = int(new_df["N° Commande"].nunique())
         skipped = 0
-        merged = new_df
+        updated_statuts = 0
+        merged = new_rows
 
     sauvegarder_csv(merged, master_path)
 
@@ -353,6 +370,7 @@ def api_import():
         "nouvelles_lignes": int(len(new_rows)),
         "nouvelles_commandes": new_orders,
         "commandes_ignorees": skipped,
+        "statuts_mis_a_jour": updated_statuts,
         "total_lignes": int(len(merged)),
         "errors": errors,
     }

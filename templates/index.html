@@ -239,6 +239,7 @@ a{color:inherit;text-decoration:none}
 .badge.e{color:#0369a1;background:#f0f9ff}
 .badge.n{color:var(--muted);background:var(--bg)}
 .badge.s-confirme{color:var(--green);background:var(--green-bg)}
+.badge.s-facture{color:#0369a1;background:#f0f9ff}
 .badge.s-autre{color:var(--muted);background:var(--bg)}
 /* Badge "facturé à" */
 .badge-facture{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:600;white-space:nowrap;background:#fff7ed;color:#c2410c;border:1px solid #fed7aa}
@@ -432,7 +433,8 @@ function factureBadge(concerne, facture){
   return `<span class="badge-facture"><span class="bf-arrow">facturé →</span> ${esc(f)}</span>`;
 }
 function statutBadge(s){
-  const cls = (s||"").toLowerCase().includes("confirm")?"s-confirme":"s-autre";
+  const v=(s||"").toLowerCase();
+  const cls = v.includes("confirm")?"s-confirme":v.includes("factur")?"s-facture":"s-autre";
   return `<span class="badge ${cls}">${esc(s)}</span>`;
 }
 function contact(r){
@@ -462,6 +464,8 @@ function filtered(){
     (x["Contact Nom"]||"").toLowerCase().includes(q)||
     (x["Contact Prénom"]||"").toLowerCase().includes(q)
   );
+  // Masquer les commandes non confirmées / non facturées
+  r=r.filter(x=>{ const v=(x["Statut"]||"").toLowerCase(); return v.includes("confirm")||v.includes("factur"); });
   if(filterStatut!=="all") r=r.filter(x=>x["Statut Traitement"]===filterStatut);
   if(filterDateFrom||filterDateTo){
     r=r.filter(x=>{
@@ -890,7 +894,10 @@ document.getElementById("btnRun").addEventListener("click",async()=>{
     const d=await r.json();
     if(d.ok){
       res.className="ok";
-      res.textContent=`✅ ${d.nouvelles_commandes} nouvelles commandes · ${d.nouvelles_lignes} lignes ajoutées${d.commandes_ignorees?` · ${d.commandes_ignorees} ignorées (déjà présentes)`:""}`;
+      const parts=[`✅ ${d.nouvelles_commandes} nouvelles commandes · ${d.nouvelles_lignes} lignes ajoutées`];
+      if(d.commandes_ignorees) parts.push(`${d.commandes_ignorees} déjà présentes`);
+      if(d.statuts_mis_a_jour) parts.push(`${d.statuts_mis_a_jour} statut${d.statuts_mis_a_jour>1?"s":""} mis à jour`);
+      res.textContent=parts.join(" · ");
       // Auto-dismiss après 6 secondes
       setTimeout(()=>{ res.classList.add("fade"); setTimeout(()=>{ res.className=""; res.textContent=""; },400); },6000);
       // Switch to master file
