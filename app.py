@@ -526,6 +526,17 @@ def api_export():
     )
 
 
+@app.route("/api/reset-master", methods=["POST"])
+def api_reset_master():
+    master_path = os.path.join(DOSSIER, MASTER_FILE)
+    try:
+        if os.path.exists(master_path):
+            os.remove(master_path)
+        return jsonify({"ok": True})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
 @app.route("/api/presets/reset-space", methods=["POST"])
 def api_reset_space_preset():
     codes = construire_preset_space()

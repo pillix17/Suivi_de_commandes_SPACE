@@ -40,6 +40,8 @@ a{color:inherit;text-decoration:none}
 #statsBar .sep{color:#334155}
 .btn-import{background:#3b82f6;color:white;border:none;border-radius:7px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;transition:background .15s;flex-shrink:0}
 .btn-import:hover{background:#2563eb}
+.btn-reset-master{padding:6px 12px;border:1px solid var(--red-border);border-radius:7px;background:var(--red-bg);color:var(--red);font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;margin-left:auto}
+.btn-reset-master:hover{background:#fee2e2}
 .btn-import.open{background:#1d4ed8}
 
 /* ── IMPORT DRAWER ── */
@@ -161,12 +163,17 @@ a{color:inherit;text-decoration:none}
 .tab{padding:5px 12px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;color:var(--muted);border:none;background:transparent;transition:all .15s;white-space:nowrap}
 .tab.active{background:white;color:var(--accent);box-shadow:0 1px 3px rgba(0,0,0,.1)}
 .tab:hover:not(.active){color:var(--text)}
-.sf-wrap{display:flex;gap:3px}
-.sf{padding:5px 10px;border-radius:6px;border:1px solid var(--border);background:white;cursor:pointer;font-size:11px;font-weight:600;color:var(--muted);transition:all .15s;white-space:nowrap}
-.sf.active[data-s="A faire"]{color:var(--red);background:var(--red-bg);border-color:var(--red-border)}
-.sf.active[data-s="En cours"]{color:var(--amber);background:var(--amber-bg);border-color:var(--amber-border)}
-.sf.active[data-s="Traité"]{color:var(--green);background:var(--green-bg);border-color:var(--green-border)}
-.sf.active[data-s="all"]{color:var(--accent);background:var(--accent-bg);border-color:#bfdbfe}
+.statut-dropdown{position:relative;flex-shrink:0}
+.statut-dropdown-btn{display:flex;align-items:center;gap:6px;padding:5px 11px;border-radius:6px;border:1px solid var(--border);background:white;cursor:pointer;font-size:11px;font-weight:600;color:var(--muted);white-space:nowrap;transition:all .15s}
+.statut-dropdown-btn:hover,.statut-dropdown-btn.open{color:var(--text);border-color:#94a3b8}
+.statut-dropdown-btn.active{color:#7c3aed;background:#f5f3ff;border-color:#ddd6fe}
+.statut-badge{background:#7c3aed;color:white;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700}
+.dd-arrow{font-size:9px;color:var(--muted)}
+.statut-dropdown-panel{position:absolute;top:calc(100% + 6px);left:0;background:white;border:1px solid var(--border);border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.12);padding:8px 6px;z-index:300;min-width:160px}
+.dd-section-label{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;padding:2px 8px 4px}
+.dd-item{display:flex;align-items:center;gap:8px;padding:5px 8px;border-radius:5px;font-size:12px;cursor:pointer;color:var(--text);white-space:nowrap}
+.dd-item:hover{background:var(--bg)}
+.dd-item input[type=checkbox]{accent-color:#7c3aed;cursor:pointer;width:14px;height:14px}
 
 /* ── CONTENT ── */
 #content{max-width:1280px;margin:0 auto;padding:16px}
@@ -310,6 +317,7 @@ table.flat td.num{text-align:right;font-variant-numeric:tabular-nums}
     <button class="btn-run" id="btnRun" disabled>Normaliser et<br>importer</button>
     <div id="importResult"></div>
     <button class="btn-history" id="btnHistory">📋 Historique</button>
+    <button class="btn-reset-master" id="btnResetMaster" onclick="resetMaster()" title="Vider entièrement le fichier suivi master">🗑 Vider le master</button>
   </div>
   <div id="historyPanel">
     <h3>Historique des imports</h3>
@@ -330,11 +338,19 @@ table.flat td.num{text-align:right;font-variant-numeric:tabular-nums}
     <button class="tab" data-tab="entreprise">Entreprises</button>
     <button class="tab" data-tab="produit">Produits</button>
   </div>
-  <div class="sf-wrap">
-    <button class="sf active" data-s="all">Tous</button>
-    <button class="sf" data-s="A faire">À faire</button>
-    <button class="sf" data-s="En cours">En cours</button>
-    <button class="sf" data-s="Traité">Traité</button>
+  <div class="statut-dropdown" id="statutDropdown">
+    <button class="statut-dropdown-btn" id="statutDropdownBtn" onclick="toggleStatutDropdown()">
+      Statuts <span class="statut-badge" id="statutBadgeCount" style="display:none"></span> <span class="dd-arrow">▾</span>
+    </button>
+    <div class="statut-dropdown-panel" id="statutDropdownPanel" style="display:none">
+      <div class="dd-section-label">Traitement</div>
+      <label class="dd-item"><input type="checkbox" name="sf" value="A faire" onchange="onStatutCheck()"> À faire</label>
+      <label class="dd-item"><input type="checkbox" name="sf" value="En cours" onchange="onStatutCheck()"> En cours</label>
+      <label class="dd-item"><input type="checkbox" name="sf" value="Traité" onchange="onStatutCheck()"> Traité</label>
+      <div class="dd-section-label" style="margin-top:8px">Commande</div>
+      <label class="dd-item"><input type="checkbox" name="sf2" value="Confirmée" onchange="onStatutCheck()"> Confirmée</label>
+      <label class="dd-item"><input type="checkbox" name="sf2" value="Facturée" onchange="onStatutCheck()"> Facturée</label>
+    </div>
   </div>
   <button class="btn-prod-filter" id="btnProdFilter" onclick="openProductModal()">
     🎛 <span id="pfLabel">Tous les produits</span>
@@ -392,7 +408,8 @@ let allRecords = [];
 let currentFile = "";
 let currentTab = "commande";
 let searchQuery = "";
-let filterStatut = "all";
+let filterStatut = new Set();       // vide = tous
+let filterSourceStatut = new Set(); // vide = tous
 let filterDateFrom = "";
 let filterDateTo = "";
 let openCards = new Set();
@@ -466,7 +483,8 @@ function filtered(){
   );
   // Masquer les commandes non confirmées / non facturées
   r=r.filter(x=>{ const v=(x["Statut"]||"").toLowerCase(); return v.includes("confirm")||v.includes("factur"); });
-  if(filterStatut!=="all") r=r.filter(x=>x["Statut Traitement"]===filterStatut);
+  if(filterSourceStatut.size) r=r.filter(x=>filterSourceStatut.has(x["Statut"]));
+  if(filterStatut.size) r=r.filter(x=>filterStatut.has(x["Statut Traitement"]));
   if(filterDateFrom||filterDateTo){
     r=r.filter(x=>{
       const raw=(x["Date Commande"]||"").trim().split(" ")[0]; // DD/MM/YYYY
@@ -978,13 +996,30 @@ document.querySelectorAll(".tab").forEach(btn=>{
   });
 });
 
-document.querySelectorAll(".sf").forEach(btn=>{
-  btn.addEventListener("click",function(){
-    document.querySelectorAll(".sf").forEach(b=>b.classList.remove("active"));
-    this.classList.add("active");
-    filterStatut=this.dataset.s;
-    flatPage=1; render();
-  });
+function toggleStatutDropdown(){
+  const panel=document.getElementById("statutDropdownPanel");
+  const btn=document.getElementById("statutDropdownBtn");
+  const open=panel.style.display==="none";
+  panel.style.display=open?"":"none";
+  btn.classList.toggle("open",open);
+}
+function onStatutCheck(){
+  filterStatut=new Set([...document.querySelectorAll("input[name=sf]:checked")].map(x=>x.value));
+  filterSourceStatut=new Set([...document.querySelectorAll("input[name=sf2]:checked")].map(x=>x.value));
+  const total=filterStatut.size+filterSourceStatut.size;
+  const badge=document.getElementById("statutBadgeCount");
+  const btn=document.getElementById("statutDropdownBtn");
+  badge.style.display=total?"":"none";
+  badge.textContent=total;
+  btn.classList.toggle("active",total>0);
+  flatPage=1; render();
+}
+document.addEventListener("click",e=>{
+  const dd=document.getElementById("statutDropdown");
+  if(dd && !dd.contains(e.target)){
+    document.getElementById("statutDropdownPanel").style.display="none";
+    document.getElementById("statutDropdownBtn").classList.remove("open");
+  }
 });
 
 document.getElementById("fileSelect").addEventListener("change",function(){ loadData(this.value); });
@@ -1283,10 +1318,24 @@ function clearDateFilter(){
   flatPage=1; render();
 }
 
+async function resetMaster(){
+  if(!confirm("⚠️ Vider entièrement le fichier suivi master ?\n\nToutes les commandes et statuts de traitement seront supprimés. Cette action est irréversible.")) return;
+  if(!confirm("Confirmez une deuxième fois : supprimer toutes les données du master ?")) return;
+  const r = await fetch("/api/reset-master", {method:"POST"});
+  const d = await r.json();
+  if(d.ok){
+    allRecords=[];
+    showToast("🗑 Master vidé — réimportez vos fichiers");
+    render(); updateStats();
+  } else {
+    showToast("❌ Erreur : " + (d.error||"inconnue"));
+  }
+}
+
 function exportCSV(){
   const params = new URLSearchParams();
   params.set("fichier", currentFile || "suivi_master.csv");
-  if(filterStatut !== "all") params.set("statut", filterStatut);
+  if(filterStatut.size===1) params.set("statut", [...filterStatut][0]);
   if(filterDateFrom) params.set("date_from", filterDateFrom);
   if(filterDateTo)   params.set("date_to",   filterDateTo);
   if(filterProducts !== null){
