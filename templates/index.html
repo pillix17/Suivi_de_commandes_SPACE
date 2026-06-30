@@ -722,7 +722,7 @@ function renderEntreprises(recs,container){
         ${oHT>0?`<span style="margin-left:auto;font-weight:700;color:var(--text)">${fmtEUR(oHT)}</span>`:""}
         <button class="btn-all" onclick="markAll(event,[${oLines.map(l=>l["_index"]).join(",")}],'Traité')">✓ Tout traité</button>
       </div>`;
-      html+=ptable(oLines,["Code Produit","Libellé Produit","Quantité","Total HT","Statut Traitement"]);
+      html+=ptable(oLines,["Code Produit","Libellé Produit","Quantité","Total HT","Statut","Statut Traitement"]);
     }
     html+=`</div></div></div>`;
   }
@@ -753,7 +753,7 @@ function renderProduits(recs,container){
         ${ht>0?`<span class="card-ht">${fmtEUR(ht)}</span>`:""}
       </div>
       <div class="card-body${isOpen?" open":""}">`;
-    html+=ptable(lines,["Société / Client","N° Commande","Quantité","Total HT","Statut Traitement"]);
+    html+=ptable(lines,["Société / Client","N° Commande","Quantité","Total HT","Statut","Statut Traitement"]);
     html+=`</div></div>`;
   }
   html+="</div>";
